@@ -136,7 +136,7 @@ pacman -Syy --noconfirm --needed \
   echo 'if [ -r "/var/run/docker.sock" ];then' ; \
   echo 'SOCKET_GID="$(stat -c "%g" "/var/run/docker.sock")" ; ' ; \
   echo '  if [ "${SOCKET_GID}" != 0 ]; then' ; \
-  echo '      if [ "$(cat "/etc/group" | grep :${SOCKET_GID}:)" =  ]; then sudoIf groupadd --gid "${SOCKET_GID}" "docker-host"; fi' ; \
+  echo '      if [ "$(cat "/etc/group" | grep :${SOCKET_GID}:)" = "" ]; then sudoIf groupadd --gid "${SOCKET_GID}" "docker-host"; fi' ; \
   echo '      if [ "$(id "$(whoami)" | grep -E "groups=.*(=|,)${SOCKET_GID}\(")" = "" ]; then sudoIf usermod -aG "${SOCKET_GID}" "$(whoami)"; fi' ; \
   echo '  fi' ; \
   echo 'fi' ; \
