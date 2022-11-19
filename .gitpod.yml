@@ -1,0 +1,31 @@
+---
+image: fjolsvin/gp-archlinux-workspace
+tasks:
+  - name: Update OS packages
+    openMode: tab-before
+    init: |
+      sudo pacman -Syyu --noconfirm ;
+      sudo aura -Ayyuxac --noconfirm --skipinteg --skippgpcheck ;
+  - name: Build and push images
+    openMode: tab-before
+    before: |
+      echo "${DOCKER_PASSWORD}" \
+      | docker login --username "${DOCKER_USERNAME}" --password-stdin
+ports:
+  - name: syncthing
+    port: 8384
+    description: syncthing UI
+    onOpen: ignore
+    visibility: private
+github:
+  prebuilds:
+    master: true
+    branches: true
+    pullRequests: true
+    pullRequestsFromForks: true
+    addCheck: false
+    addComment: false
+    addBadge: true
+vscode:
+  extensions:
+    - https://github.com/pouyakary/comment/releases/download/v11.2.0/comment-v-11.0.2.vsix
