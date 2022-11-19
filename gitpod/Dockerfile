@@ -105,7 +105,7 @@ pacman -Syy --noconfirm --needed \
   "psutils" \
   "bash-completion" ;
 #  ╭──────────────────────────────────────────────────────────╮
-#  │              install makpkg dependencies                 │
+#  │              install makepkg dependencies                │
 #  ╰──────────────────────────────────────────────────────────╯
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
@@ -128,6 +128,9 @@ RUN \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
 pacman -Syy --noconfirm --needed \
 "docker" \
+"docker-buildx" \
+"docker-machine" \
+"docker-scan" \
 "docker-compose" \
 && ( \
   echo '#!/bin/sh' ; \
@@ -247,7 +250,7 @@ pacman -Syy --noconfirm --needed "fzf" \
   echo '[ -r "/usr/share/fzf/key-bindings.bash" ] && source "/usr/share/fzf/key-bindings.bash"' ; \
   echo '[ -r "/usr/share/fzf/completion.bash" ] && source "/usr/share/fzf/completion.bash"' ; \
 ) | tee "/etc/profile.d/fzf.sh" > /dev/null || exit 1 ;
-
+# '
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 install lua packages                     │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -255,17 +258,45 @@ ENV PATH="${PATH}:${HOME}/.luarocks/bin"
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-pacman -Syy --noconfirm --needed "lua" ;
-# hadolint ignore=DL3059
+pacman -Syy --noconfirm --needed \
+  "lua" \
+  "luajit" \
+  "luarocks" ;
+#  ╭──────────────────────────────────────────────────────────╮
+#  │                 install go packages                      │
+#  ╰──────────────────────────────────────────────────────────╯
+ENV GO111MODULE="on"
+ENV CGO_ENABLED="0"
+ENV CGO_LDFLAGS="-s -w -extldflags '-static'"
+# hadolint ignore=SC2016
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-pacman -Syy --noconfirm --needed "luajit" ;
-# hadolint ignore=DL3059
+pacman -Syy --noconfirm --needed \
+  "go" \
+&& go version > /dev/null 2>&1 \
+&&  ( \
+  echo 'export PATH="${PATH}:$(go env GOPATH)/bin";' ; \
+) | tee "/etc/profile.d/go.sh" > /dev/null || exit 1 ;
+#  ╭──────────────────────────────────────────────────────────╮
+#  │                 install ruby packages                    │
+#  ╰──────────────────────────────────────────────────────────╯
+ENV GEM_PATH="${HOME}/.gem"
+# hadolint ignore=SC2016,DL3028
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-pacman -Syy --noconfirm --needed "luarocks" ;
+pacman -Syy --noconfirm --needed \
+  "ruby" \
+&& gem --version > /dev/null 2>&1 \
+&& gem install --no-user-install \
+  "bundler" \
+  "serverspec" \
+&&  ( \
+  echo 'export GEM_HOME="$(ruby -e "puts Gem.user_dir")";' ; \
+  echo 'export PATH="${PATH}:${GEM_HOME}/bin";' ; \
+) | tee "/etc/profile.d/ruby.sh" > /dev/null || exit 1 ;
+
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                     python packages                      │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -337,6 +368,9 @@ done ;
 #  ╰──────────────────────────────────────────────────────────╯
 ENV EDITOR="nvim"
 ENV VISUAL="nvim"
+ARG WORKDIR="/workspace"
+ENV WORKDIR "${WORKDIR}"
+WORKDIR "${WORKDIR}"
 RUN \
   ( \
     echo "[ -r '/entrypoint' ] && /entrypoint bash --login" ; \
@@ -356,9 +390,6 @@ RUN \
 #  │                         finalize                         │
 #  ╰──────────────────────────────────────────────────────────╯
 USER "root"
-ARG WORKDIR="/workspace"
-ENV WORKDIR "${WORKDIR}"
-WORKDIR "${WORKDIR}"
 RUN \
 ln -sf "/usr/share/zoneinfo/America/New_York" "/etc/localtime" \
 && chown "$(id -u "${USER}"):$(id -g "${USER}")" -R  \
