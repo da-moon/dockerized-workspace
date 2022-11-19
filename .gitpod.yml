@@ -6,11 +6,25 @@ tasks:
     init: |
       sudo pacman -Syyu --noconfirm ;
       sudo aura -Ayyuxac --noconfirm --skipinteg --skippgpcheck ;
+  - name: Setup pre-commit
+    before: |
+      pre-commit install
+    init: |
+      pre-commit install --install-hooks ;
+    command: |
+      pre-commit autoupdate ;
+      git add .pre-commit-config.yaml ;
   - name: Build and push images
     openMode: tab-before
     before: |
       echo "${DOCKER_PASSWORD}" \
       | docker login --username "${DOCKER_USERNAME}" --password-stdin
+    init: |
+      docker buildx create \
+        --use \
+        --name "$(basename -s ".git" "$(git remote get-url origin)")" \
+        --driver docker-container \
+      && docker buildx bake ;
 ports:
   - name: syncthing
     port: 8384
