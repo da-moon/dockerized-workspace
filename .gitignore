@@ -19,6 +19,7 @@
 !/.github/ISSUE_TEMPLATE/
 !/.github/ISSUE_TEMPLATE/*.md
 #  ────────────────────────────────────────────────────────────────────
+!/.gitpod.yml
 !/.editorconfig
 !/.gitignore
 !/.dockerignore
