@@ -338,6 +338,9 @@ done ;
 ENV EDITOR="nvim"
 ENV VISUAL="nvim"
 RUN \
+  ( \
+    echo "[ -r '/entrypoint' ] && /entrypoint bash --login" ; \
+  ) | tee "${HOME}/.bashrc" > /dev/null ; \
   # ─── SSH SETUP ──────────────────────────────────────────────────────────────────
   mkdir -p "${HOME}/.ssh" \
   && chmod 700 "${HOME}/.ssh" \
