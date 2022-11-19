@@ -357,7 +357,8 @@ ARG WORKDIR="/workspace"
 ENV WORKDIR "${WORKDIR}"
 WORKDIR "${WORKDIR}"
 RUN \
-chown "$(id -u "${USER}"):$(id -g "${USER}")" -R  \
+ln -sf "/usr/share/zoneinfo/America/New_York" "/etc/localtime" \
+&& chown "$(id -u "${USER}"):$(id -g "${USER}")" -R  \
   "${WORKDIR}" "${HOME}" \
 # ─── CLEAN UP PACMAN BUILD DEPS ─────────────────────────────────────────────────
 && pacman -Qdtq | pacman -Rs --noconfirm - || true \
