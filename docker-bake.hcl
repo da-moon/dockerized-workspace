@@ -19,7 +19,6 @@
 # ╰──────────────────────────────────────────────────────────╯
 # docker buildx use default && docker buildx ls | awk '$2 ~ /^docker(-container)*$/{print $1}' | xargs -r -I {} docker buildx rm {}
 variable "LOCAL" {default=false}
-variable "IMAGE_NAME" {default="gp-archlinux-workspace"}
 variable "TAG" {default=""}
 variable "MAIN_REGISTRY_HOSTNAME" {default="docker.io"}
 variable "MAIN_REGISTRY_USERNAME" {default="fjolsvin"}
@@ -27,29 +26,26 @@ variable "CACHE_REGISTRY_HOSTNAME" {default="docker.io"}
 variable "CACHE_REGISTRY_USERNAME" {default="fjolsvin"}
 group "default" {
   targets = [
-    "base",
+    "gitpod",
   ]
 }
-target "base" {
+target "gitpod" {
   context    = "."
-  dockerfile = "base/Dockerfile"
+  dockerfile = "gitpod/Dockerfile"
   tags       = [
     equal(LOCAL,true)
-    ? "${IMAGE_NAME}-base"
-    : "${MAIN_REGISTRY_HOSTNAME}/${MAIN_REGISTRY_USERNAME}/${IMAGE_NAME}-base:latest",
-      equal("",TAG)?"" : "${MAIN_REGISTRY_HOSTNAME}/${MAIN_REGISTRY_USERNAME}/${IMAGE_NAME}-base:${TAG}",
+    ? "gp-archlinux-workspace"
+    : "${MAIN_REGISTRY_HOSTNAME}/${MAIN_REGISTRY_USERNAME}/gp-archlinux-workspace:latest",
   ]
   cache-from = [
     equal(LOCAL,true)
     ? ""
-    : "type=registry,mode=max,ref=${CACHE_REGISTRY_HOSTNAME}/${CACHE_REGISTRY_USERNAME}/${IMAGE_NAME}-base-cache:latest" ,
-      equal("",TAG) ? "": "type=registry,mode=max,ref=${CACHE_REGISTRY_HOSTNAME}/${CACHE_REGISTRY_USERNAME}/${IMAGE_NAME}-base-cache:${TAG}"
+    : "type=registry,mode=max,ref=${CACHE_REGISTRY_HOSTNAME}/${CACHE_REGISTRY_USERNAME}/gp-archlinux-workspace:cache" ,
   ]
   cache-to   = [
     equal(LOCAL,true)
     ? ""
-    : "type=registry,mode=max,ref=${CACHE_REGISTRY_HOSTNAME}/${CACHE_REGISTRY_USERNAME}/${IMAGE_NAME}-base-cache:latest" ,
-      equal("",TAG) ? "" : "type=registry,mode=max,ref=${CACHE_REGISTRY_HOSTNAME}/${CACHE_REGISTRY_USERNAME}/${IMAGE_NAME}-base-cache:${TAG}",
+    : "type=registry,mode=max,ref=${CACHE_REGISTRY_HOSTNAME}/${CACHE_REGISTRY_USERNAME}/gp-archlinux-workspace:cache" ,
   ]
   output     = [
     equal(LOCAL,true)
