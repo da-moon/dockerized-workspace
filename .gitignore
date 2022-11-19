@@ -1,0 +1,38 @@
+*
+!*/
+#  ────────────────────────────────────────────────────────────────────
+#!/contrib/**
+#!/fixtures/**
+!/assets/**
+#!/docs/**
+#  ────────────────────────────────────────────────────────────────────
+!/**/.gitkeep
+#  ────────────────────────────────────────────────────────────────────
+!/.cspell/*.txt
+#  ────────────────────────────────────────────────────────────
+!/.vscode/**
+!/.devcontainer/**
+#  ────────────────────────────────────────────────────────────
+!/.github/CODEOWNERS
+!/.github/ISSUE_TEMPLATE/
+!/.github/ISSUE_TEMPLATE/*.md
+#  ────────────────────────────────────────────────────────────────────
+!/.editorconfig
+!/.gitignore
+!/.dockerignore
+!/cspell.config.yaml
+!/.markdownlintignore
+!/.stignore
+!/.versionrc
+!/.pre-commit-config.yaml
+!/.github-labels.json
+#  ────────────────────────────────────────────────────────────
+!/LICENSE
+!/README.md
+!/commitlint.config.js
+!/Justfile
+!/Makefile
+!/Vagrantfile
+!/docker-bake.hcl
+!/CONTRIBUTING.md
+!/CHANGELOG.md
