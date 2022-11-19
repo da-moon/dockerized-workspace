@@ -6,6 +6,12 @@ tasks:
     init: |
       sudo pacman -Syyu --noconfirm ;
       sudo aura -Ayyuxac --noconfirm --skipinteg --skippgpcheck ;
+  - name: Neovim
+    before: |
+      [ ! -d "/workspace/.nvim.d" ] \
+      && git clone https://git.sr.ht/~havi/nvim.d "/workspace/.nvim.d"
+    init: |
+      [ -d "/workspace/.nvim.d" ] && make -C "/workspace/.nvim.d" install
   - name: Setup pre-commit
     before: |
       pre-commit install
