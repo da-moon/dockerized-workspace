@@ -19,11 +19,8 @@
 # ╰──────────────────────────────────────────────────────────╯
 # docker buildx use default && docker buildx ls | awk '$2 ~ /^docker(-container)*$/{print $1}' | xargs -r -I {} docker buildx rm {}
 variable "LOCAL" {default=false}
-variable "TAG" {default=""}
-variable "MAIN_REGISTRY_HOSTNAME" {default="docker.io"}
-variable "MAIN_REGISTRY_USERNAME" {default="fjolsvin"}
-variable "CACHE_REGISTRY_HOSTNAME" {default="docker.io"}
-variable "CACHE_REGISTRY_USERNAME" {default="fjolsvin"}
+variable "REGISTRY_HOSTNAME" {default="docker.io"}
+variable "REGISTRY_USERNAME" {default="fjolsvin"}
 group "default" {
   targets = [
     "gitpod",
@@ -35,17 +32,17 @@ target "gitpod" {
   tags       = [
     equal(LOCAL,true)
     ? "gp-archlinux-workspace"
-    : "${MAIN_REGISTRY_HOSTNAME}/${MAIN_REGISTRY_USERNAME}/gp-archlinux-workspace:latest",
+    : "${REGISTRY_HOSTNAME}/${REGISTRY_USERNAME}/gp-archlinux-workspace:latest",
   ]
   cache-from = [
     equal(LOCAL,true)
     ? ""
-    : "type=registry,mode=max,ref=${CACHE_REGISTRY_HOSTNAME}/${CACHE_REGISTRY_USERNAME}/gp-archlinux-workspace:cache" ,
+    : "type=registry,mode=max,ref=${REGISTRY_HOSTNAME}/${REGISTRY_USERNAME}/gp-archlinux-workspace:cache" ,
   ]
   cache-to   = [
     equal(LOCAL,true)
     ? ""
-    : "type=registry,mode=max,ref=${CACHE_REGISTRY_HOSTNAME}/${CACHE_REGISTRY_USERNAME}/gp-archlinux-workspace:cache" ,
+    : "type=registry,mode=max,ref=${REGISTRY_HOSTNAME}/${REGISTRY_USERNAME}/gp-archlinux-workspace:cache" ,
   ]
   output     = [
     equal(LOCAL,true)
