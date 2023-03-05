@@ -14,6 +14,7 @@ tasks:
       if aura --version > /dev/null 2>&1 ; then
         sudo aura -Ayyuxac --noconfirm --skipinteg --skippgpcheck ;
       fi
+      exit 0 ;
   - name: ensure just is installed
     openMode: tab-before
     command: |
@@ -23,25 +24,55 @@ tasks:
         --tlsv1.2 -sSf "https://just.systems/install.sh" \
         | sudo bash -s -- --to /usr/local/bin
       fi
+      exit 0 ;
+  - name: ensure 'Task' is installed
+    openMode: tab-before
+    before: |
+      if ! task --version > /dev/null 2>&1 ; then
+        if [ "$(which "go-task" 2>/dev/null)" != "" ]; then
+          sudo ln -sf "$(which "go-task" 2>/dev/null)" "/usr/local/bin/task"
+        fi
+      fi
+      exit 0 ;
+    command: |
+      if ! task --version > /dev/null 2>&1 ; then
+        dir="$(mktemp -d)" \
+        && pushd "$dir" > /dev/null 2>&1 \
+        && git clone --bare "https://aur.archlinux.org/go-task-bin.git" .git \
+        && git fetch --all \
+        && git config --local --bool core.bare false \
+        && git reset --hard \
+        && makepkg -sicr --noconfirm --needed \
+        && popd > /dev/null 2>&1 \
+        && rm -rf "$dir"
+      fi
+      if [ "$(which "go-task" 2>/dev/null)" != "" ]; then
+        sudo ln -sf "$(which "go-task" 2>/dev/null)" "/usr/local/bin/task"
+      fi
+      exit 0 ;
   - name: Setup pre-commit
     before: |
       pre-commit install ;
       pre-commit install --install-hooks ;
       pre-commit install --hook-type commit-msg ;
       pre-commit install-hooks ;
+      exit 0 ;
     command: |
       pre-commit autoupdate ;
       git add .pre-commit-config.yaml ;
+      exit 0 ;
   - name: Setup buildx
     openMode: tab-before
     before: |
       echo "${DOCKER_PASSWORD}" \
       | docker login --username "${DOCKER_USERNAME}" --password-stdin
+      exit 0 ;
     command: |
       docker buildx create \
         --use \
         --name "$(basename -s ".git" "$(git remote get-url origin)")" \
-        --driver docker-container
+        --driver docker-container ;
+      exit 0 ;
 ports:
   - name: syncthing
     port: 8384
