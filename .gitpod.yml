@@ -5,12 +5,18 @@ image:
 tasks:
   - name: update packages
     openMode: tab-before
-    before: |
+    command: |
+      if paru --version > /dev/null 2>&1 ; then
+        paru -Syyu --noconfirm ;
+        exit 0 ;
+      fi
       sudo pacman -Syyu --noconfirm ;
-      sudo aura -Ayyuxac --noconfirm --skipinteg --skippgpcheck ;
+      if aura --version > /dev/null 2>&1 ; then
+        sudo aura -Ayyuxac --noconfirm --skipinteg --skippgpcheck ;
+      fi
   - name: ensure just is installed
     openMode: tab-before
-    before: |
+    command: |
       if ! just --version > /dev/null 2>&1 ; then
         curl \
         --proto '=https' \
@@ -22,6 +28,7 @@ tasks:
       pre-commit install ;
       pre-commit install --install-hooks ;
       pre-commit install --hook-type commit-msg ;
+      pre-commit install-hooks ;
     command: |
       pre-commit autoupdate ;
       git add .pre-commit-config.yaml ;

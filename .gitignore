@@ -23,6 +23,7 @@
 !/.editorconfig
 !/.gitignore
 !/.dockerignore
+!/.gitlint
 !/cspell.config.yaml
 !/.markdownlintignore
 !/.stignore
@@ -34,6 +35,7 @@
 !/README.md
 !/commitlint.config.js
 !/Justfile
+!/Taskfile.yml
 !/Makefile
 !/Vagrantfile
 !/docker-bake.hcl
