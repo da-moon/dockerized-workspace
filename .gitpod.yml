@@ -1,36 +1,40 @@
 ---
-image: fjolsvin/gp-archlinux-workspace
+image:
+  file: .gp/Dockerfile
+  context: .
 tasks:
-  - name: Update OS packages
+  - name: update packages
     openMode: tab-before
-    init: |
+    before: |
       sudo pacman -Syyu --noconfirm ;
       sudo aura -Ayyuxac --noconfirm --skipinteg --skippgpcheck ;
-  - name: Neovim
+  - name: ensure just is installed
+    openMode: tab-before
     before: |
-      [ ! -d "/workspace/.nvim.d" ] \
-      && git clone https://git.sr.ht/~havi/nvim.d "/workspace/.nvim.d"
-    init: |
-      [ -d "/workspace/.nvim.d" ] && make -C "/workspace/.nvim.d" install
+      if ! just --version > /dev/null 2>&1 ; then
+        curl \
+        --proto '=https' \
+        --tlsv1.2 -sSf "https://just.systems/install.sh" \
+        | sudo bash -s -- --to /usr/local/bin
+      fi
   - name: Setup pre-commit
     before: |
-      pre-commit install
-    init: |
+      pre-commit install ;
       pre-commit install --install-hooks ;
+      pre-commit install --hook-type commit-msg ;
     command: |
       pre-commit autoupdate ;
       git add .pre-commit-config.yaml ;
-  - name: Build and push images
+  - name: Setup buildx
     openMode: tab-before
     before: |
       echo "${DOCKER_PASSWORD}" \
       | docker login --username "${DOCKER_USERNAME}" --password-stdin
-    init: |
+    command: |
       docker buildx create \
         --use \
         --name "$(basename -s ".git" "$(git remote get-url origin)")" \
-        --driver docker-container \
-      && docker buildx bake ;
+        --driver docker-container
 ports:
   - name: syncthing
     port: 8384
