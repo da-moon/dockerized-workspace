@@ -105,7 +105,9 @@ RUN \
   "psutils" \
   "moreutils" \
   "rclone" \
+  "expac" \
   "bash-completion" ;
+
 #  ╭──────────────────────────────────────────────────────────╮
 #  │              install makepkg dependencies                │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -387,8 +389,9 @@ RUN \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   AUR_CLONE_URLS=( \
-  "https://aur.archlinux.org/neovim-git.git" \
   "https://aur.archlinux.org/aura-bin.git" \
+  "https://aur.archlinux.org/paru-bin.git" \
+  "https://aur.archlinux.org/go-task.git" \
   "https://aur.archlinux.org/git-completion.git" \
   "https://aur.archlinux.org/fzf-extras.git" \
   ) ; \
@@ -399,6 +402,17 @@ RUN \
   for i in {1..5}; do makepkg -sicr --noconfirm && break || sleep 15; done \
   && popd > /dev/null 2>&1 || exit 1 ; \
   done ;
+#  ╭──────────────────────────────────────────────────────────╮
+#  │                    install text editors                  │
+#  ╰──────────────────────────────────────────────────────────╯
+# pacman -Si helix | awk -F':' '/^ .*: / {print $1}' | sed 's/\s//g'
+RUN \
+  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
+  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
+  pacman -Syy --noconfirm --needed \
+  "neovim" \
+  "helix" \
+  && pacman -Syy --asdeps --noconfirm --needed "$(expac -S "%o" "helix")" ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                   user profile config                    │
 #  ╰──────────────────────────────────────────────────────────╯
