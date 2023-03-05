@@ -27,15 +27,13 @@ tasks:
       exit 0 ;
   - name: ensure 'Task' is installed
     openMode: tab-before
-    before: |
-      if ! task --version > /dev/null 2>&1 ; then
-        if [ "$(which "go-task" 2>/dev/null)" != "" ]; then
-          sudo ln -sf "$(which "go-task" 2>/dev/null)" "/usr/local/bin/task"
-        fi
-      fi
-      exit 0 ;
     command: |
       if ! task --version > /dev/null 2>&1 ; then
+        if [ "$(which "go-task" 2>/dev/null)" != "" ]; then
+          sudo ln -sf "$(which "go-task" 2>/dev/null)" "/usr/local/bin/task";
+          exit 0 ;
+        fi
+
         dir="$(mktemp -d)" \
         && pushd "$dir" > /dev/null 2>&1 \
         && git clone --bare "https://aur.archlinux.org/go-task-bin.git" .git \
@@ -51,23 +49,19 @@ tasks:
       fi
       exit 0 ;
   - name: Setup pre-commit
-    before: |
+    command: |
       pre-commit install ;
       pre-commit install --install-hooks ;
       pre-commit install --hook-type commit-msg ;
       pre-commit install-hooks ;
-      exit 0 ;
-    command: |
       pre-commit autoupdate ;
       git add .pre-commit-config.yaml ;
       exit 0 ;
   - name: Setup buildx
     openMode: tab-before
-    before: |
+    command: |
       echo "${DOCKER_PASSWORD}" \
       | docker login --username "${DOCKER_USERNAME}" --password-stdin
-      exit 0 ;
-    command: |
       docker buildx create \
         --use \
         --name "$(basename -s ".git" "$(git remote get-url origin)")" \
