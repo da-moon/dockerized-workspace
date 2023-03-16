@@ -75,12 +75,12 @@ repos:
       - id: editorconfig-checker
         exclude: CHANGELOG.md
   - repo: https://github.com/zricethezav/gitleaks
-    rev: v8.16.0
+    rev: v8.16.1
     hooks:
       - id: gitleaks
         description: Detect hardcoded secrets using Gitleaks
   - repo: https://github.com/jorisroovers/gitlint
-    rev: v0.19.0dev
+    rev: v0.19.1
     hooks:
       - id: gitlint
         description: Lint git commit messages.

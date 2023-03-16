@@ -344,8 +344,9 @@ RUN \
   "python" \
   "python-pip" \
   "python-setuptools" \
-  "python-pre-commit" ; \
-  && curl -sSL https://install.python-poetry.org | python3 - \
+  "python-pre-commit" \
+  && sudo -i -u "${USER}" bash -c 'curl -sSL https://install.python-poetry.org | python3 -' \
+  && ln -sf "${HOME}/.local/bin/poetry" "/usr/local/bin/poetry" \
   && poetry --version > /dev/null 2>&1 \
   && ( \
   echo 'eval "$(poetry completions bash)" ;' ; \
@@ -422,33 +423,33 @@ RUN \
   "neovim"
 # Install language servers
 # hadolint ignore=DL3016
-# RUN \
-#   npm install -g \
-#     awk-language-server \
-#     bash-language-server \
-#     dockerfile-language-server-nodejs \
-#     yaml-language-server \
-#     vscode-json-languageserver ; \
-#   python3 -m pip install "python-lsp-server[all]"
-#   go version > /dev/null 2>&1 && { \
-#     go install golang.org/x/tools/gopls@latest ; \
-#     go install github.com/hashicorp/terraform-ls@latest ; \
-#   } ; \
-#   wget -qO - "https://api.github.com/repos/artempyanykh/marksman/releases/latest" \
-#   | jq -r "\
-#   .assets[]|select(\
-#   .browser_download_url \
-#   | (\
-#   contains(\"linux\") \
-#   and (contains(\"sha256\") | not) \
-#   )).browser_download_url" \
-#   | xargs -r -I {} wget -qO "/usr/local/bin/marksman" {} \
-#   && chmod +x "/usr/local/bin/marksman" ;
+RUN \
+  npm install -g awk-language-server && awk-language-server --version > /dev/null 2>&1 && \
+  npm install -g bash-language-server && bash-language-server --version > /dev/null 2>&1 && \
+  npm install -g dockerfile-language-server-nodejs && docker-langserver --node-ipc > /dev/null 2>&1 && \
+  npm install -g yaml-language-server && yaml-language-server --node-ipc > /dev/null 2>&1 && \
+  npm install -g vscode-json-languageserver ; \
+  python3 -m pip install "python-lsp-server[all]" ; \
+  go version > /dev/null 2>&1 && { \
+    go install golang.org/x/tools/gopls@latest && gopls version > /dev/null 2>&1 ; \
+    go install github.com/hashicorp/terraform-ls@latest && terraform-ls version > /dev/null 2>&1 ; \
+  } ; \
+  wget -qO - "https://api.github.com/repos/artempyanykh/marksman/releases/latest" \
+  | jq -r "\
+  .assets[]|select(\
+  .browser_download_url \
+  | (\
+  contains(\"linux\") \
+  and (contains(\"sha256\") | not) \
+  )).browser_download_url" \
+  | xargs -r -I {} wget -qO "/usr/local/bin/marksman" {} \
+  && chmod +x "/usr/local/bin/marksman" \
+  && marksman --version ;
 # Setup Helix installer script
 RUN \
 ( \
   echo '#!/usr/bin/env bash' ; \
-  echo 'set -xeuo pipefail ;' ; \
+  echo 'set -euo pipefail ;' ; \
   echo '! wget --version > /dev/null 2>&1 && { echo "*** "wget" not found"; exit 1; } ' ; \
   echo '! jq --version > /dev/null 2>&1 && { echo "*** "jq" not found"; exit 1; } ' ; \
   echo '! sudo --version > /dev/null 2>&1 && { echo "*** "sudo" not found"; exit 1; } ' ; \
@@ -471,7 +472,8 @@ RUN \
   echo '  | xz -d -c  \' ; \
   echo '  | tar -xv -C "${dir}" --strip-components=1 ' ; \
   echo 'chmod +x "${dir}/hx"' ; \
-  echo 'sudo mv -f "${dir}/hx" "/usr/local/bin/hx"' ; \
+  echo '[ ! -d "${HOME}/.local/bin" ] && mkdir -p "${HOME}/.local/bin" ;' ; \
+  echo 'mv -f "${dir}/hx" "${HOME}/.local/bin/hx"' ; \
   echo '[ -d "${HOME}/.config/helix/runtime" ] && sudo rm -r "${HOME}/.config/helix/runtime"' ; \
   echo 'mkdir -p "${HOME}/.config/helix"' ; \
   echo 'mv "${dir}/runtime" "${HOME}/.config/helix/runtime"' ; \
@@ -480,8 +482,8 @@ RUN \
   echo 'hx --grammar build' ; \
 ) | tee /usr/local/share/install-helix.sh > /dev/null \
 && chmod +x /usr/local/share/install-helix.sh \
-&& sudo -i -u codespace bash -c '/usr/local/share/install-helix.sh' ;
-
+&& sudo -i -u "${USER}" bash -c '/usr/local/share/install-helix.sh' \
+&& [ -r "${HOME}/.local/bin/hx" ] && ln -sf "${HOME}/.local/bin/hx" "/usr/local/bin/hx"
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                   user profile config                    │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -502,12 +504,25 @@ RUN \
   echo "  StrictHostKeyChecking no" ; \
   echo "  MACs hmac-sha2-512" ; \
   echo "  UserKnownHostsFile=/dev/null" ; \
+  echo "  IdentityFile=~/.ssh/id_rsa_sourcehut" ; \
   ) | tee "${HOME}/.ssh/config" > /dev/null \
   && chmod 644 "${HOME}/.ssh/config" ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                         finalize                         │
 #  ╰──────────────────────────────────────────────────────────╯
 USER "root"
+RUN \
+( \
+  echo 'set -euo pipefail ;' ; \
+  echo 'chmod 700 "${HOME}/.ssh" ;' ; \
+  echo '[ -r "${HOME}/.ssh/authorized_keys" ] && chmod 644 "${HOME}/.ssh/authorized_keys" ;' ; \
+  echo '[ -r "${HOME}/.ssh/known_hosts" ] && chmod 644 "${HOME}/.ssh/known_hosts" ;' ; \
+  echo '[ -r "${HOME}/.ssh/config" ] && chmod 644 "${HOME}/.ssh/config" ;' ; \
+  echo 'find "${HOME}/.ssh" -type f -name "id*" -exec chmod 600 {} \;' ; \
+  echo 'find "${HOME}/.ssh" -type f -name "id*.pub" -exec chmod 644 {} \;' ; \
+  echo 'exit 0 ;' ; \
+) | tee /usr/local/share/fix-ssh-permissions.sh > /dev/null \
+&& chmod +x /usr/local/share/fix-ssh-permissions.sh  ;
 RUN \
   ln -sf "/usr/share/zoneinfo/America/New_York" "/etc/localtime" \
   && chown "$(id -u "${USER}"):$(id -g "${USER}")" -R  \
@@ -544,6 +559,7 @@ RUN \
   echo '#!/bin/sh' ; \
   echo '[ -r "/usr/local/share/docker-from-docker.sh" ] && bash "/usr/local/share/docker-from-docker.sh"' ; \
   echo '[ -r "/usr/local/share/kary-comments.sh" ] && bash "/usr/local/share/kary-comments.sh"' ; \
+  echo '[ -r "/usr/local/share/fix-ssh-permissions.sh" ] && bash "/usr/local/share/fix-ssh-permissions.sh"' ; \
   echo 'exec "$@"' ; \
   ) | tee '/entrypoint' > /dev/null \
   && chmod +x '/entrypoint' ;

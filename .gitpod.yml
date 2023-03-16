@@ -3,11 +3,15 @@ image:
   file: .gp/Dockerfile
   context: .
 tasks:
-  - name: update packages
+  - name: "update-packages"
     openMode: tab-before
     command: |
+      set -euo pipefail ;
       if paru --version > /dev/null 2>&1 ; then
-        paru -Syyu --noconfirm ;
+        paru -Syyu --removemake --cleanafter --noconfirm ;
+        [ -d "${HOME}/.cache/paru/clone/" ] ;
+        /bin/rm -rf "${HOME}/.cache/paru/clone" ;
+        mkdir -p "${HOME}/.cache/paru/clone/" ;
         exit 0 ;
       fi
       sudo pacman -Syyu --noconfirm ;
@@ -15,9 +19,10 @@ tasks:
         sudo aura -Ayyuxac --noconfirm --skipinteg --skippgpcheck ;
       fi
       exit 0 ;
-  - name: ensure just is installed
+  - name: "ensure-just-is-installed"
     openMode: tab-before
     command: |
+      set -euo pipefail ;
       if ! just --version > /dev/null 2>&1 ; then
         curl \
         --proto '=https' \
@@ -25,15 +30,15 @@ tasks:
         | sudo bash -s -- --to /usr/local/bin
       fi
       exit 0 ;
-  - name: ensure 'Task' is installed
+  - name: "ensure-go-task-is-installed"
     openMode: tab-before
     command: |
+      set -euo pipefail ;
       if ! task --version > /dev/null 2>&1 ; then
         if [ "$(which "go-task" 2>/dev/null)" != "" ]; then
           sudo ln -sf "$(which "go-task" 2>/dev/null)" "/usr/local/bin/task";
           exit 0 ;
         fi
-
         dir="$(mktemp -d)" \
         && pushd "$dir" > /dev/null 2>&1 \
         && git clone --bare "https://aur.archlinux.org/go-task-bin.git" .git \
@@ -48,24 +53,54 @@ tasks:
         sudo ln -sf "$(which "go-task" 2>/dev/null)" "/usr/local/bin/task"
       fi
       exit 0 ;
-  - name: Setup pre-commit
+  - name: "setup-pre-commit"
     command: |
-      pre-commit install ;
-      pre-commit install --install-hooks ;
-      pre-commit install --hook-type commit-msg ;
-      pre-commit install-hooks ;
-      pre-commit autoupdate ;
-      git add .pre-commit-config.yaml ;
+      set -euo pipefail ;
+      ! pre-commit --version > /dev/null 2>&1 && python3 -m pip install pre-commit --version > /dev/null 2>&1 && {
+        pre-commit install ;
+        pre-commit install --install-hooks ;
+        pre-commit install --hook-type commit-msg ;
+        pre-commit install-hooks ;
+        pre-commit autoupdate ;
+        git add .pre-commit-config.yaml ;
+      }
       exit 0 ;
-  - name: Setup buildx
+  - name: "setup-docker-buildx"
     openMode: tab-before
     command: |
+      set -euo pipefail ;
       echo "${DOCKER_PASSWORD}" \
       | docker login --username "${DOCKER_USERNAME}" --password-stdin
       docker buildx create \
         --use \
         --name "$(basename -s ".git" "$(git remote get-url origin)")" \
         --driver docker-container ;
+      exit 0 ;
+  - name: "setup-sourcehut-ssh-key"
+    openMode: tab-before
+    command: |
+      set -euo pipefail ;
+      [ ! -d "${HOME}/.ssh" ] && mkdir "${HOME}/.ssh" ;
+      if [ -n "${SOURCEHUT_PRIVATE_KEY+x}" ] && [ -n "${SOURCEHUT_PRIVATE_KEY}" ]; then
+      echo "${SOURCEHUT_PRIVATE_KEY}" | base64 -d | tee ~/.ssh/id_rsa_sourcehut > /dev/null
+      fi
+      chmod 700 "${HOME}/.ssh" ;
+      [ -r "${HOME}/.ssh/authorized_keys" ] && chmod 644 "${HOME}/.ssh/authorized_keys" ;
+      [ -r "${HOME}/.ssh/known_hosts" ] && chmod 644 "${HOME}/.ssh/known_hosts" ;
+      [ -r "${HOME}/.ssh/config" ] && chmod 644 "${HOME}/.ssh/config" ;
+      find "${HOME}/.ssh" -type f -name 'id*' -exec chmod 600 {} \;
+      find "${HOME}/.ssh" -type f -name 'id*.pub' -exec chmod 644 {} \;
+      exit 0 ;
+  - name: "fix-ssh-directory-permissions"
+    openMode: tab-before
+    command: |
+      set -euo pipefail ;
+      chmod 700 "${HOME}/.ssh" ;
+      [ -r "${HOME}/.ssh/authorized_keys" ] && chmod 644 "${HOME}/.ssh/authorized_keys" ;
+      [ -r "${HOME}/.ssh/known_hosts" ] && chmod 644 "${HOME}/.ssh/known_hosts" ;
+      [ -r "${HOME}/.ssh/config" ] && chmod 644 "${HOME}/.ssh/config" ;
+      find "${HOME}/.ssh" -type f -name 'id*' -exec chmod 600 {} \;
+      find "${HOME}/.ssh" -type f -name 'id*.pub' -exec chmod 644 {} \;
       exit 0 ;
 ports:
   - name: syncthing
