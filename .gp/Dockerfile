@@ -344,7 +344,12 @@ RUN \
   "python" \
   "python-pip" \
   "python-setuptools" \
-  "python-pre-commit" ;
+  "python-pre-commit" ; \
+  && curl -sSL https://install.python-poetry.org | python3 - \
+  && poetry --version > /dev/null 2>&1 \
+  && ( \
+  echo 'eval "$(poetry completions bash)" ;' ; \
+  ) | tee "/etc/profile.d/poetry.sh" > /dev/null || exit 1 ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 install nodejs packages                  │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -406,18 +411,81 @@ RUN \
 #  │                    install text editors                  │
 #  ╰──────────────────────────────────────────────────────────╯
 # pacman -Si helix | awk -F':' '/^ .*: / {print $1}' | sed 's/\s//g'
+USER "root"
+ENV COLORTERM="truecolor"
+ENV EDITOR="nvim"
+ENV VISUAL="nvim"
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   pacman -Syy --noconfirm --needed \
-  "neovim" \
-  "helix" \
-  && pacman -Syy --asdeps --noconfirm --needed "$(expac -S "%o" "helix")" ;
+  "neovim"
+# Install language servers
+# hadolint ignore=DL3016
+# RUN \
+#   npm install -g \
+#     awk-language-server \
+#     bash-language-server \
+#     dockerfile-language-server-nodejs \
+#     yaml-language-server \
+#     vscode-json-languageserver ; \
+#   python3 -m pip install "python-lsp-server[all]"
+#   go version > /dev/null 2>&1 && { \
+#     go install golang.org/x/tools/gopls@latest ; \
+#     go install github.com/hashicorp/terraform-ls@latest ; \
+#   } ; \
+#   wget -qO - "https://api.github.com/repos/artempyanykh/marksman/releases/latest" \
+#   | jq -r "\
+#   .assets[]|select(\
+#   .browser_download_url \
+#   | (\
+#   contains(\"linux\") \
+#   and (contains(\"sha256\") | not) \
+#   )).browser_download_url" \
+#   | xargs -r -I {} wget -qO "/usr/local/bin/marksman" {} \
+#   && chmod +x "/usr/local/bin/marksman" ;
+# Setup Helix installer script
+RUN \
+( \
+  echo '#!/usr/bin/env bash' ; \
+  echo 'set -xeuo pipefail ;' ; \
+  echo '! wget --version > /dev/null 2>&1 && { echo "*** "wget" not found"; exit 1; } ' ; \
+  echo '! jq --version > /dev/null 2>&1 && { echo "*** "jq" not found"; exit 1; } ' ; \
+  echo '! sudo --version > /dev/null 2>&1 && { echo "*** "sudo" not found"; exit 1; } ' ; \
+  echo '! xz --version > /dev/null 2>&1 && { echo "*** "xz" not found"; exit 1; } ' ; \
+  echo '! tar --version > /dev/null 2>&1 && { echo "*** "xz" not found"; exit 1; } ' ; \
+  echo '! xargs --version > /dev/null 2>&1 && { echo "*** "xz" not found"; exit 1; } ' ; \
+  echo 'dir="$(mktemp -d)" ;' ; \
+  echo 'architecture="x86_64"' ; \
+  echo 'wget -qO - "https://api.github.com/repos/helix-editor/helix/releases/latest" \' ; \
+  echo '| jq -r "\' ; \
+  echo '.assets[]|select(\' ; \
+  echo '.browser_download_url \' ; \
+  echo '| (\' ; \
+  echo 'contains(\"${architecture}\") \' ; \
+  echo 'and contains(\"linux\") \' ; \
+  echo 'and contains(\"tar\") \' ; \
+  echo 'and (contains(\"sha256\") | not) \' ; \
+  echo ')).browser_download_url" \' ; \
+  echo '  | xargs -r -I {} wget -O - {} 2> /dev/null \' ; \
+  echo '  | xz -d -c  \' ; \
+  echo '  | tar -xv -C "${dir}" --strip-components=1 ' ; \
+  echo 'chmod +x "${dir}/hx"' ; \
+  echo 'sudo mv -f "${dir}/hx" "/usr/local/bin/hx"' ; \
+  echo '[ -d "${HOME}/.config/helix/runtime" ] && sudo rm -r "${HOME}/.config/helix/runtime"' ; \
+  echo 'mkdir -p "${HOME}/.config/helix"' ; \
+  echo 'mv "${dir}/runtime" "${HOME}/.config/helix/runtime"' ; \
+  echo 'hx --version && rm -r "${dir}"' ; \
+  echo 'hx --grammar fetch' ; \
+  echo 'hx --grammar build' ; \
+) | tee /usr/local/share/install-helix.sh > /dev/null \
+&& chmod +x /usr/local/share/install-helix.sh \
+&& sudo -i -u codespace bash -c '/usr/local/share/install-helix.sh' ;
+
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                   user profile config                    │
 #  ╰──────────────────────────────────────────────────────────╯
-ENV EDITOR="nvim"
-ENV VISUAL="nvim"
+USER "${USER}"
 ARG WORKDIR="/workspace"
 ENV WORKDIR "${WORKDIR}"
 WORKDIR "${WORKDIR}"
@@ -483,7 +551,6 @@ RUN \
 USER "${USER}"
 VOLUME ["${HOME}","${WORKDIR}}"]
 ENV TERM "xterm"
-ENV COLORTERM "truecolor"
 ENV DOCKER_BUILDKIT "1"
 ENTRYPOINT [ "/entrypoint" ]
 CMD [ "sleep", "infinity" ]
