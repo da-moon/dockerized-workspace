@@ -55,3 +55,32 @@ tasks:
     preconditions:
       - sh: terraform --version
         msg: '`terraform` binary was not found in PATH'
+  # ──────────────────────────────────────────────────────────────────────────────
+  format:
+    desc: Format Terraform files
+    summary: Format Terraform files
+    aliases: [fmt, tf-fmt, tffmt, fmt-terraform]
+    cmds:
+      - cmd: |
+          powershell -c '
+          $files=(git ls-files --exclude-standard "*.tfvars" "*.tf");
+          $files+=(git ls-files --exclude-standard --others "*.tfvars" "*.tf");
+          foreach ($file in $files) {
+            if ((Get-Item $file).Extension -in ".tf", ".tfvars") {
+              terraform fmt -write=true "$file"
+            }
+          }'
+        platforms: [windows]
+      - cmd: |
+          while read file; do
+            terraform fmt -write=true "${file}"
+          done < <( \
+            git ls-files --exclude-standard '*.tfvars' '*.tf' ; \
+            git ls-files --exclude-standard --others '*.tfvars' '*.tf' ; \
+          )
+        platforms: [linux, darwin]
+    preconditions:
+      - sh: terraform --version
+        msg: '`terraform` binary was not found in PATH'
+      - sh: git --version
+        msg: '`git` binary was not found in PATH'
