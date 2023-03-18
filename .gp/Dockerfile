@@ -282,7 +282,7 @@ USER "root"
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman -Syy --noconfirm --needed "bat" \
+  pacman -Syy --noconfirm --needed "bat" "bat-extras" \
   && bat --version > /dev/null 2>&1 && ( \
   echo 'alias cat="bat -pp" ;' ; \
   echo "export MANPAGER='sh -c \"col -bx | bat --language man --style plain\"' ;" ; \
