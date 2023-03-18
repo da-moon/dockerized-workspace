@@ -553,7 +553,7 @@ RUN \
   # terraform
 #   "https://aur.archlinux.org/tfsec-bin.git" \
   "https://aur.archlinux.org/tflint-bin.git" \
-  "https://aur.archlinux.org/terrascan-bin.git" \
+#   "https://aur.archlinux.org/terrascan-bin.git" \
   "https://aur.archlinux.org/tfenv.git" \
   "https://aur.archlinux.org/terraform-docs-bin.git" \
   # ansible
