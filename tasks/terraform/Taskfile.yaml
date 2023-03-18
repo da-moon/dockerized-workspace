@@ -126,3 +126,40 @@ tasks:
     preconditions:
       - sh: tflint --version
         msg: '`tflint` binary was not found in PATH'
+  # ──────────────────────────────────────────────────────────────────────────────
+  tfsec:
+    desc: >
+      tfsec - a simple tool to detect
+      potential security vulnerabilities
+      in your terraformed infrastructure.
+    summary: >
+      tfsec - a simple tool to detect
+      potential security vulnerabilities
+      in your terraformed infrastructure.
+    cmds:
+      # https://stackoverflow.com/q/26705846
+      - cmd: |
+          powershell -c '
+              $files=(git ls-files --exclude-standard "*.tfvars");
+              $files+=(git ls-files --exclude-standard --others "*.tfvars");
+              $COMMAND=@();
+              $COMMAND+=("tfsec",".");
+              foreach ($file in $files) {
+                $COMMAND+=@("--tfvars-file", "`"$file`"")
+              };
+              $COMMAND+=@(";");
+              Invoke-Expression ($COMMAND -join " ")'
+        platforms: [windows]
+      - cmd: |
+          COMMAND=("tfsec" ".")
+          while read file; do
+            COMMAND+=("--var-file" "$file")
+          done < <( \
+            git ls-files --exclude-standard "*.tfvars" ; \
+            git ls-files --exclude-standard --others "*.tfvars" \
+            ) ;
+          "${COMMAND[@]}"
+        platforms: [linux, darwin]
+    preconditions:
+      - sh: tfsec --version
+        msg: '`tfsec` binary was not found in PATH'
