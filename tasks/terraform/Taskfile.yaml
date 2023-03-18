@@ -10,4 +10,17 @@ tasks:
     preconditions:
       - sh: terraform --version
         msg: '`terraform` binary was not found in PATH'
+  # ──────────────────────────────────────────────────────────────────────────────
+  validate:
+    desc: Terraform validate
+    summary: Terraform validate
+    aliases: [tfv, tf-validate, tfvalidate, validate-terraform]
+    deps: [init]
+    cmds:
+      - cmd: terraform validate
+    status:
+      - '[ -d "{{.ROOT_DIR}}/.terraform" ] && exit 0 || exit 1'
+    preconditions:
+      - sh: terraform --version
+        msg: '`terraform` binary was not found in PATH'
 # ──────────────────────────────────────────────────────────────────────────────
