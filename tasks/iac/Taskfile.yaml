@@ -1,5 +1,7 @@
 ---
 version: '3'
+includes:
+  terraform: ../terraform
 tasks:
   checkov:
     desc: >

@@ -1,0 +1,13 @@
+---
+version: '3'
+tasks:
+  init:
+    desc: Terraform init
+    summary: Terraform init
+    aliases: [tfi, tf-init, tfinit]
+    cmds:
+      - cmd: terraform -chdir=$WORKING_DIR init
+    preconditions:
+      - sh: terraform --version
+        msg: '`terraform` binary was not found in PATH'
+# ──────────────────────────────────────────────────────────────────────────────
