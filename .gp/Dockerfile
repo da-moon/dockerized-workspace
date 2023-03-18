@@ -459,7 +459,7 @@ RUN \
   go version > /dev/null 2>&1 && { \
     go install golang.org/x/tools/gopls@latest && gopls version > /dev/null 2>&1 ; \
     go install github.com/hashicorp/terraform-ls@latest && terraform-ls version > /dev/null 2>&1 ; \
-    chown "$(id -u "${USER}"):$(id -g "${USER}")" -R "$(go env GOPATH)"
+    chown "$(id -u "${USER}"):$(id -g "${USER}")" -R "$(go env GOPATH)" ; \
   } ; \
   wget -qO - "https://api.github.com/repos/artempyanykh/marksman/releases/latest" \
   | jq -r "\
