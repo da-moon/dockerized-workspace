@@ -1,0 +1,18 @@
+---
+version: '3'
+tasks:
+  checkov:
+    desc: >
+      Checkov - A tool for security and compliance
+      misconfigurations analysis
+      that uses graph-based scanning.
+    summary: >
+      Security and compliance misconfigurations
+      analysis with Checkov using graph-based scanning.
+    cmds:
+      - cmd: checkov --config-file .checkov.yaml
+    preconditions:
+      - sh: '[ -r "{{.ROOT_DIR}}/.checkov.yaml" ] && exit 0 || exit 1'
+        msg: '`{{.ROOT_DIR}}/.checkov.yaml` file was not found'
+      - sh: checkov --version
+        msg: '`checkov` binary was not found in PATH'

@@ -20,6 +20,12 @@
 !/.gp
 !/.gp/*
 #  ────────────────────────────────────────────────────────────────────
+!/.checkov.yaml
+#  ────────────────────────────────────────────────────────────────────
+!/tasks/
+!/tasks/**/*.yaml
+!/Taskfile.yaml
+#  ────────────────────────────────────────────────────────────────────
 !/.editorconfig
 !/.gitignore
 !/.dockerignore
@@ -35,7 +41,6 @@
 !/README.md
 !/commitlint.config.js
 !/Justfile
-!/Taskfile.yml
 !/Makefile
 !/Vagrantfile
 !/docker-bake.hcl
