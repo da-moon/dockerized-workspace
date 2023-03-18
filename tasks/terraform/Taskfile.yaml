@@ -96,3 +96,33 @@ tasks:
     preconditions:
       - sh: terraform-docs --version
         msg: '`terraform-docs` binary was not found in PATH'
+  # ──────────────────────────────────────────────────────────────────────────────
+  tflint:
+    desc: tflint - A Pluggable Terraform Linter
+    summary: tflint - A Pluggable Terraform Linter
+    cmds:
+      - cmd: tflint --init
+      - cmd: |
+          powershell -c '
+            $files=(git ls-files --exclude-standard "*.tfvars");
+            $files+=(git ls-files --exclude-standard --others "*.tfvars");
+            $COMMAND=@();
+            $COMMAND+=("tflint","--chdir","$WORKING_DIR");
+            foreach ($file in $files) {
+              $COMMAND+=@("--tfvars-file", "`"$file`"") };
+              $COMMAND+=@(";");
+              Invoke-Expression ($COMMAND -join " ")'
+        platforms: [windows]
+      - cmd: |
+          COMMAND=("tflint" "--chdir" "${WORKING_DIR}")
+          while read file; do
+            COMMAND+=("--var-file" "$file")
+          done < <( \
+            git ls-files --exclude-standard "*.tfvars" ; \
+            git ls-files --exclude-standard --others "*.tfvars"; \
+          ) ;
+          "${COMMAND[@]}"
+        platforms: [linux, darwin]
+    preconditions:
+      - sh: tflint --version
+        msg: '`tflint` binary was not found in PATH'
