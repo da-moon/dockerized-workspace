@@ -553,20 +553,22 @@ RUN \
   # terraform
 #   "https://aur.archlinux.org/tfsec-bin.git" \
   "https://aur.archlinux.org/tflint-bin.git" \
+# fails
 #   "https://aur.archlinux.org/terrascan-bin.git" \
   "https://aur.archlinux.org/tfenv.git" \
   "https://aur.archlinux.org/terraform-docs-bin.git" \
   # ansible
   "https://aur.archlinux.org/ansible-completion-git.git" \
   # generic tools
-#   "https://aur.archlinux.org/pulumictl.git" \
+  "https://aur.archlinux.org/pulumictl.git" \
   "https://aur.archlinux.org/infracost.git" \
   "https://aur.archlinux.org/driftctl-bin.git" \
   "https://aur.archlinux.org/rancher-k3d-bin.git" \
-#   "https://aur.archlinux.org/envoyproxy-bin.git" \
+  "https://aur.archlinux.org/envoyproxy-bin.git" \
   "https://aur.archlinux.org/gojira.git" \
   "https://aur.archlinux.org/k6.git" \
-  "https://aur.archlinux.org/litmusctl.git" \
+# error in check()
+#   "https://aur.archlinux.org/litmusctl.git" \
   ) ; \
   export MAKEFLAGS="-j$(nproc)" ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
