@@ -459,6 +459,7 @@ RUN \
   go version > /dev/null 2>&1 && { \
     go install golang.org/x/tools/gopls@latest && gopls version > /dev/null 2>&1 ; \
     go install github.com/hashicorp/terraform-ls@latest && terraform-ls version > /dev/null 2>&1 ; \
+    chown "$(id -u "${USER}"):$(id -g "${USER}")" -R "$(go env GOPATH)"
   } ; \
   wget -qO - "https://api.github.com/repos/artempyanykh/marksman/releases/latest" \
   | jq -r "\
@@ -550,9 +551,9 @@ RUN \
 #   "https://aur.archlinux.org/bicep-bin.git" \
 #   "https://aur.archlinux.org/google-cloud-cli.git" \
   # terraform
-  "https://aur.archlinux.org/tfsec-bin.git" \
+#   "https://aur.archlinux.org/tfsec-bin.git" \
   "https://aur.archlinux.org/tflint-bin.git" \
-  "https://aur.archlinux.org/terrascan.git" \
+  "https://aur.archlinux.org/terrascan-bin.git" \
   "https://aur.archlinux.org/tfenv.git" \
   "https://aur.archlinux.org/terraform-docs-bin.git" \
   # ansible
