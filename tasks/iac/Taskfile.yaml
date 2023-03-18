@@ -30,3 +30,36 @@ tasks:
       - sh: driftctl version
         msg: '`driftctl` binary was not found in PATH'
     ignore_error: true
+  # ──────────────────────────────────────────────────────────────────────────────
+  infracost:
+    desc: infracost - Generate cost estimates from Terraform
+    summary: infracost - Generate cost estimates from Terraform
+    dir: $WORKING_DIR
+    cmds:
+      - cmd: |
+          powershell -c '
+            $files=(git ls-files --exclude-standard "*.tfvars");
+            $files+=(git ls-files --exclude-standard --others "*.tfvars");
+            $COMMAND=@();
+            $COMMAND+=("infracost","breakdown","--path",".");
+            foreach ($file in $files) {
+              $COMMAND+=@("--terraform-var-file", "`"$file`"")
+            };
+            $COMMAND+=@(";");
+            Invoke-Expression ($COMMAND -join " ")'
+        platforms: [windows]
+      - cmd: |
+          COMMAND=("infracost" "breakdown" "--path" ".")
+          while read item; do
+            COMMAND+=("--terraform-var-file" "$item")
+          done < <( \
+            git ls-files --exclude-standard "*.tfvars" ; \
+            git ls-files --exclude-standard --others "*.tfvars" \
+            )
+          "${COMMAND[@]}"
+        platforms: [linux, darwin]
+    preconditions:
+      - sh: infracost --version
+        msg: '`infracost` binary was not found in PATH'
+      - sh: '[ "$INFRACOST_API_KEY" != "" ]'
+        msg: '`INFRACOST_API_KEY` environment variable was not found'
