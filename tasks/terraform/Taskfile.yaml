@@ -84,3 +84,15 @@ tasks:
         msg: '`terraform` binary was not found in PATH'
       - sh: git --version
         msg: '`git` binary was not found in PATH'
+  # ──────────────────────────────────────────────────────────────────────────────
+  docs:
+    desc: Update Terraform docs
+    summary: Update Terraform docs
+    cmds:
+      - cmd: |
+          terraform-docs markdown
+          --config .terraform-docs.yml
+          --output-file foo.md .
+    preconditions:
+      - sh: terraform-docs --version
+        msg: '`terraform-docs` binary was not found in PATH'
