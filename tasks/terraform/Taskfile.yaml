@@ -45,3 +45,13 @@ tasks:
     preconditions:
       - sh: terraform --version
         msg: '`terraform` binary was not found in PATH'
+  # ──────────────────────────────────────────────────────────────────────────────
+  destroy:
+    desc: Terraform Destroy
+    summary: Terraform Destroy
+    aliases: [tfd, tf-destroy, tfdestroy]
+    cmds:
+      - terraform -chdir=$WORKING_DIR apply -auto-approve -destroy
+    preconditions:
+      - sh: terraform --version
+        msg: '`terraform` binary was not found in PATH'
