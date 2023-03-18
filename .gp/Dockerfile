@@ -545,10 +545,10 @@ RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   AUR_CLONE_URLS=( \
   # cloud
-  "https://aur.archlinux.org/azure-cli.git" \
-  "https://aur.archlinux.org/azcopy.git" \
-  "https://aur.archlinux.org/bicep-bin.git" \
-  "https://aur.archlinux.org/google-cloud-cli.git" \
+#   "https://aur.archlinux.org/azure-cli.git" \
+#   "https://aur.archlinux.org/azcopy.git" \
+#   "https://aur.archlinux.org/bicep-bin.git" \
+#   "https://aur.archlinux.org/google-cloud-cli.git" \
   # terraform
   "https://aur.archlinux.org/tfsec-bin.git" \
   "https://aur.archlinux.org/tflint-bin.git" \
@@ -558,11 +558,11 @@ RUN \
   # ansible
   "https://aur.archlinux.org/ansible-completion-git.git" \
   # generic tools
-  "https://aur.archlinux.org/pulumictl.git" \
+#   "https://aur.archlinux.org/pulumictl.git" \
   "https://aur.archlinux.org/infracost.git" \
   "https://aur.archlinux.org/driftctl-bin.git" \
   "https://aur.archlinux.org/rancher-k3d-bin.git" \
-  "https://aur.archlinux.org/envoyproxy-bin.git" \
+#   "https://aur.archlinux.org/envoyproxy-bin.git" \
   "https://aur.archlinux.org/gojira.git" \
   "https://aur.archlinux.org/k6.git" \
   "https://aur.archlinux.org/litmusctl.git" \
@@ -623,7 +623,7 @@ RUN \
   done ; \
   find "${HOME}/.tflint.d/plugins" -type f -exec chmod +x {} \; ; \
   tfenv --version >/dev/null 2>&1 && ( \
-    tfenv tfenv install "latest" \
+    tfenv install "latest" \
     && tfenv use "latest" ; \
   ) || exit 0 ;
 # ────────────────────────────────────────────────────────────────────────────────
