@@ -163,3 +163,51 @@ tasks:
     preconditions:
       - sh: tfsec --version
         msg: '`tfsec` binary was not found in PATH'
+  # ──────────────────────────────────────────────────────────────────────────────
+  terrascan:init:
+    desc: initialize terrascan
+    summary: initialize terrascan
+    internal: true
+    cmds:
+      - cmd: terrascan init
+    status:
+      - '[ -r ~/.terrascan/README.md ] && exit 0 || exit 1'
+    preconditions:
+      - sh: terrascan version
+        msg: '`terrascan` binary was not found in PATH'
+  terrascan:
+    desc: >
+      Terrascan - a tool to detect compliance and
+      security violations across Infrastructure as
+      Code with Terrascan
+    summary: >
+      Detect compliance and security violations
+      across Infrastructure as Code with Terrascan
+    dir: $WORKING_DIR
+    deps:
+      - terrascan:init
+    cmds:
+      - cmd: |
+          powershell -c '
+          $dirs=(git ls-files --exclude-standard "*.tf" | Split-Path -parent);
+          $dirs+=(git ls-files --exclude-standard --others "*.tf" `
+            | Split-Path -parent);
+          $dirs=($dirs|Where-Object { $_ } | Select-Object -Unique))
+          foreach ( `
+            $dir in $dirs {
+              terrascan scan -d "${dir}" -i terraform --non-recursive
+            };'
+        platforms: [windows]
+      - cmd: |
+          while read dir; do
+          echo "*** Scanning '${dir}'"
+          terrascan scan -d "${dir}" -i terraform --non-recursive
+          done < <( \
+            dirname $(git ls-files --exclude-standard "*.tf" ; \
+              git ls-files --exclude-standard --others "*.tf" \
+              ) | sort -u \
+          ) ;
+        platforms: [linux, darwin]
+    preconditions:
+      - sh: terrascan version
+        msg: '`terrascan` binary was not found in PATH'
