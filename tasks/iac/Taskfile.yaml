@@ -16,3 +16,17 @@ tasks:
         msg: '`{{.ROOT_DIR}}/.checkov.yaml` file was not found'
       - sh: checkov --version
         msg: '`checkov` binary was not found in PATH'
+  # ──────────────────────────────────────────────────────────────────────────────
+  driftctl:
+    desc: Catch infrastructure drift
+    summary: >
+      driftctl is a free and open-source CLI
+      that warns of infrastructure drift and fills
+      in the missing piece in your DevSecOps toolbox.
+    dir: $WORKING_DIR
+    cmds:
+      - driftctl scan
+    preconditions:
+      - sh: driftctl version
+        msg: '`driftctl` binary was not found in PATH'
+    ignore_error: true
