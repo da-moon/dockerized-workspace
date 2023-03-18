@@ -1,0 +1,40 @@
+---
+version: '3'
+env:
+  WORKING_DIR: '{{.WORKING_DIR | default "."}}'
+dotenv: [.env]
+# ──────────────────────────────────────────────────────────────────────────────
+includes:
+  iac: ./tasks/iac
+tasks:
+  default:
+    silent: true
+    cmds:
+      - cmd: |
+          powershell -c '
+            if (-not (Get-Command "fzf" -ErrorAction SilentlyContinue)) {
+              task --list-all ;
+            } else {
+              $chosen=$(task --json --list-all `
+                | ConvertFrom-Json `
+                | Select-Object -ExpandProperty tasks `
+                | ForEach-Object { $_.name } | fzf);
+              if ( "$chosen" ) {
+                task "$chosen";
+              } else {
+                task --list-all ;
+              }
+            }'
+        platforms: [windows]
+      - cmd: |
+          # if 'fzf' or 'jq' are not available
+          ! ( \
+              fzf --version > /dev/null 2>&1 \
+              && jq --version > /dev/null 2>&1 \
+            ) && (task --list-all ; exit $?;)
+          chosen="$(task --list-all --json | jq -r '.tasks[].name' | fzf)";
+          if [ "${chosen}" != "" ]; then
+            task "${chosen}" ;
+            exit $? ;
+          fi
+        platforms: [linux, darwin]
