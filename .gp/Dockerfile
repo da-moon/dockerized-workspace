@@ -29,10 +29,17 @@ RUN \
   -e '/\[options\]/a Color' \
   -e '/\[options\]/a ILoveCandy' \
   "/etc/pacman.conf" \
-  # makepkg skip running tests
-  && sed -i -e 's/ check / !check /g' "/etc/makepkg.conf" \
+  # https://www.reddit.com/r/archlinux/comments/3ctiou/lpt_speed_up_makepkg_by_skippingparallelizing/
+  && sed -i \
+    # skip running tests
+    -e 's/ check / !check /g' \
+    # use multiple cores 
+    -e 's/COMPRESSXZ.*/COMPRESSXZ=(xz -T 0 -c -z -)/g' \
+    # skip compression
+    -e "s/PKGEXT.*/PKGEXT='.pkg.tar'/g" \
+    "/etc/makepkg.conf" \
   && ( \
-  # we use this to update installed packages one time after contaienr starts. this
+  # we use this to update installed packages one time after container starts. this
   # gets executed whe the first shell is opened. This approach is to make the
   # docker images as small as possible since upgrading all packages creates large
   # diffs and large image sizes
@@ -88,6 +95,23 @@ RUN \
   && usermod -aG wheel,root,sudo "${USER}" \
   # ─── ENSURE USER HOME HAS THE RIGHT OWNERSHIP ───────────────────────────────────
   && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}" -R
+  
+#  ╭──────────────────────────────────────────────────────────╮
+#  │              install makepkg dependencies                │
+#  ╰──────────────────────────────────────────────────────────╯
+RUN \
+  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
+  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
+  pacman --quiet -Syy --noconfirm --needed \
+  "base-devel" \
+  "upx" \
+  "git" \
+  # ─── BASE GIT CONFIGS ───────────────────────────────────────────────────────────
+  && git --version > /dev/null 2>&1 && ( \
+  git config --system push.recurseSubmodules "on-demand" \
+  && git config --system diff.submodule "log" \
+  && git config --system status.submoduleSummary "true" \
+  ) || exit 1 ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                    install core tools                    │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -108,22 +132,6 @@ RUN \
   "rclone" \
   "expac" \
   "bash-completion" ;
-
-#  ╭──────────────────────────────────────────────────────────╮
-#  │              install makepkg dependencies                │
-#  ╰──────────────────────────────────────────────────────────╯
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet -Syy --noconfirm --needed \
-  "base-devel" \
-  "git" \
-  # ─── BASE GIT CONFIGS ───────────────────────────────────────────────────────────
-  && git --version > /dev/null 2>&1 && ( \
-  git config --system push.recurseSubmodules "on-demand" \
-  && git config --system diff.submodule "log" \
-  && git config --system status.submoduleSummary "true" \
-  ) || exit 1 ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │              install core pakages from aur               │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -150,6 +158,7 @@ RUN \
 #  ╰──────────────────────────────────────────────────────────╯
 USER "root"
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+# hadolint ignore=SC2016
 RUN \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
@@ -192,34 +201,34 @@ RUN \
   "docker-buildx" \
   "docker-machine" \
   "docker-scan" \
-  "docker-compose" \
-  && ( \
-  echo '#!/bin/sh' ; \
-  echo 'sudoIf() { if [ "$(id -u)" -ne 0 ]; then sudo "$@"; else "$@"; fi }' ; \
-  # ─── DOCKER FROM DOCKER ─────────────────────────────────────────────────────────
-  echo 'if [ -r "/var/run/docker.sock" ];then' ; \
-  echo 'SOCKET_GID="$(stat -c "%g" "/var/run/docker.sock")" ; ' ; \
-  echo '  if [ "${SOCKET_GID}" != 0 ]; then' ; \
-  echo '      if [ "$(cat "/etc/group" | grep :${SOCKET_GID}:)" = "" ]; then sudoIf groupadd --gid "${SOCKET_GID}" "docker-host"; fi' ; \
-  echo '      if [ "$(id "$(whoami)" | grep -E "groups=.*(=|,)${SOCKET_GID}\(")" = "" ]; then sudoIf usermod -aG "${SOCKET_GID}" "$(whoami)"; fi' ; \
-  echo '  fi' ; \
-  echo 'fi' ; \
+  "docker-compose" ; \
+  ( \
+    echo '#!/bin/sh' ; \
+    echo 'sudoIf() { if [ "$(id -u)" -ne 0 ]; then sudo "$@"; else "$@"; fi }' ; \
+    # ─── DOCKER FROM DOCKER ─────────────────────────────────────────────────────────
+    echo 'if [ -r "/var/run/docker.sock" ];then' ; \
+    echo 'SOCKET_GID="$(stat -c "%g" "/var/run/docker.sock")" ; ' ; \
+    echo '  if [ "${SOCKET_GID}" != 0 ]; then' ; \
+    echo '      if [ "$(cat "/etc/group" | grep :${SOCKET_GID}:)" = "" ]; then sudoIf groupadd --gid "${SOCKET_GID}" "docker-host"; fi' ; \
+    echo '      if [ "$(id "$(whoami)" | grep -E "groups=.*(=|,)${SOCKET_GID}\(")" = "" ]; then sudoIf usermod -aG "${SOCKET_GID}" "$(whoami)"; fi' ; \
+    echo '  fi' ; \
+    echo 'fi' ; \
   ) | tee '/usr/local/share/docker-from-docker.sh' > /dev/null \
   && chmod +x '/usr/local/share/docker-from-docker.sh' ; \
   ( \
-    echo 'alias docker-run="docker run --rm -it -v "$PWD:/workspace"" ;' ; \
-    echo 'alias docker-run-u="docker-run --user "$(id -u):$(id -g)"" ;' ; \
-    echo 'alias ubuntu-c="docker-run -w "/workspace" ubuntu:hirsute" ;' ; \
-    echo 'alias debian-c="docker-run -w "/workspace" debian:bullseye" ;' ; \
-    echo 'alias alpine-c="docker-run -w "/workspace" alpine:edge" ;' ; \
-    echo 'alias pureos-c="docker-run -w "/workspace" pureos/pureos:byzantium-slim" ;' ; \
-    echo 'alias arch-c="docker-run -w "/workspace" archlinux bash -c "pacman-key --init && pacman-key --populate "archlinux" && exec bash --login"" ;' ; \
-    echo 'alias gitlint="docker run -u $(id -u):$(id -g) -w /repo --rm -it --ulimit nofile=1024 -v $(pwd):/repo jorisroovers/gitlint" ;' ; \
-    echo 'alias gitleaks="docker run -u $(id -u):$(id -g) -v $(pwd):/path -w /path --rm -it zricethezav/gitleaks:latest" ;' ; \
-    echo 'alias code-server="docker-run --network host -d -u "$(id -u):$(id -g)" codercom/code-server:latest --auth none" ;' ; \
-    echo 'alias rmcontainers="docker ps -aq | xargs -r docker rm -f" ;' ; \
-    echo 'alias gitlint="docker run -u $(id -u):$(id -g) -w /repo --rm -it --ulimit nofile=1024 -v $(pwd):/repo jorisroovers/gitlint" ;' ; \
-    echo 'alias reveal-md="docker run --rm  -u $(id -u):$(id -g) -p "1948:1948" -p "35729:35729" -v "$(pwd):/slides" webpronl/reveal-md:latest /slides --watch" ;' ; \
+    echo "alias docker-run='docker run --rm -it -v \"\${PWD}:/workspace\"' ;" ; \
+    echo "alias docker-run-u='docker-run --user \"\$(id -u):\$(id -g)\"' ;" ; \
+    echo "alias ubuntu-c='docker-run -w \"/workspace\" ubuntu:hirsute' ;" ; \
+    echo "alias debian-c='docker-run -w \"/workspace\" debian:bullseye' ;" ; \
+    echo "alias alpine-c='docker-run -w \"/workspace\" alpine:edge' ;" ; \
+    echo "alias pureos-c='docker-run -w \"/workspace\" pureos/pureos:byzantium-slim' ;" ; \
+    echo "alias arch-c='docker-run -w \"/workspace\" archlinux bash -c \"pacman-key --init && pacman-key --populate \"archlinux\" && exec bash --login\"' ;" ; \
+    echo "alias gitlint='docker run -u \"\$(id -u):\$(id -g)\" -w \"/repo\" --rm -it --ulimit nofile=1024 -v \"\$(pwd):/repo\" \"jorisroovers/gitlint\"' ;" ; \
+    echo "alias gitleaks='docker run -u \"\$(id -u):\$(id -g)\" -v \"\$(pwd):/path\" -w \"/path\" --rm -it \"zricethezav/gitleaks:latest\"' ;" ; \
+    echo "alias code-server='docker-run --network host -d -u \"\$(id -u):\$(id -g)\" \"codercom/code-server:latest\" --auth none' ;" ; \
+    echo "alias rmcontainers='docker ps -aq | xargs -r docker rm -f' ;" ; \
+    echo "alias gitlint='docker run -u \"\$(id -u):\$(id -g)\" -w \"/repo\" --rm -it --ulimit nofile=1024 -v \"\$(pwd):/repo\" \"jorisroovers/gitlint\"' ;" ; \
+    echo "alias reveal-md='docker run --rm  -u \"\$(id -u):\$(id -g)\" -p \"1948:1948\" -p \"35729:35729\" -v \"\$(pwd):/slides\" \"webpronl/reveal-md:latest\" /slides --watch' ;" ; \
   ) | tee "/etc/profile.d/docker.sh" > /dev/null || exit 1 ;
 
 #  ╭──────────────────────────────────────────────────────────╮
@@ -233,23 +242,7 @@ RUN \
   "noto-fonts" \
   "ttf-ubuntu-font-family" \
   "ttf-font-awesome" ;
-#  ╭──────────────────────────────────────────────────────────╮
-#  │             install modern cli applications              │
-#  ╰──────────────────────────────────────────────────────────╯
-# hadolint ignore=DL3059
-USER "root"
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet -Syy --noconfirm --needed \
-  "sd" \
-  "duf" \
-  "ncdu" \
-  "ripgrep" \
-  "ripgrep-all" \
-  "fd" \
-  "tokei" \
-  "hyperfine"  ;
+
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                          gitpod                          │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -297,6 +290,7 @@ RUN \
   echo '[ -r "/usr/share/fzf/key-bindings.bash" ] && source "/usr/share/fzf/key-bindings.bash"' ; \
   echo '[ -r "/usr/share/fzf/completion.bash" ] && source "/usr/share/fzf/completion.bash"' ; \
   ) | tee "/etc/profile.d/fzf.sh" > /dev/null || exit 1 ;
+
 #  ╭──────────────────────────────────────────────────────────╮
 #  │               build tools and task runners               │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -330,6 +324,7 @@ RUN \
 #  │                          git                             │
 #  ╰──────────────────────────────────────────────────────────╯
 USER "root"
+# hadolint ignore=SC2016
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
@@ -380,30 +375,41 @@ RUN \
   && git config --system delta.decorations.hunk-header-style "file line-number syntax" \
   && git config --system delta.interactive.keep-plus-minus-markers "false" \
   ) || exit 1 ;
-#  ────────────────────────────────────────────────────────────
+#  ╭──────────────────────────────────────────────────────────╮
+#  │                  modern cli applications                 │
+#  ╰──────────────────────────────────────────────────────────╯
 USER "root"
+ENV COLORTERM="truecolor"
+ENV EDITOR="nvim"
+ENV VISUAL="nvim"
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   pacman --quiet -Syy --noconfirm --needed \
-  "exa" \
-  && exa --version > /dev/null 2>&1 && ( \
+    "neovim" \
+    "sd" \
+    "duf" \
+    "ncdu" \
+    "ripgrep" \
+    "ripgrep-all" \
+    "fd" \
+    "tokei" \
+    "hyperfine" \
+    "exa" \
+    "bat" \
+    "bat-extras" ; \
+  bat --version > /dev/null 2>&1 && ( \
+  echo 'alias cat="bat -pp" ;' ; \
+  echo "export MANPAGER='sh -c \"col -bx | bat --language man --style plain\"' ;" ; \
+  ) | tee "/etc/profile.d/bat.sh" > /dev/null || exit 1  ; \
+  exa --version > /dev/null 2>&1 && ( \
   echo 'alias la="exa -alhF" ;' ; \
   echo 'alias ll="exa -lhF" ;' ; \
   echo 'alias llfu="exa -bghHliS --git" ;' ; \
   echo 'alias llt="exa -T" ;' ; \
   echo 'alias ls="exa" ;' ; \
   ) | tee "/etc/profile.d/exa.sh" > /dev/null || exit 1 ;
-#  ────────────────────────────────────────────────────────────
-USER "root"
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet -Syy --noconfirm --needed "bat" "bat-extras" \
-  && bat --version > /dev/null 2>&1 && ( \
-  echo 'alias cat="bat -pp" ;' ; \
-  echo "export MANPAGER='sh -c \"col -bx | bat --language man --style plain\"' ;" ; \
-  ) | tee "/etc/profile.d/bat.sh" > /dev/null || exit 1  ;
+
 #  ────────────────────────────────────────────────────────────
 
 #  ╭──────────────────────────────────────────────────────────╮
@@ -419,25 +425,76 @@ RUN \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   pacman --quiet -Syy --noconfirm --needed \
     "rustup" ; \
+
+  # https://stackoverflow.com/questions/28227739/lock-a-file-in-bash-using-flock-and-lockfile
   rustup --version > /dev/null 2>&1 && ( \
-      echo '! ( rustup toolchain list | grep -q "nightly" ) && rustup toolchain install nightly ;' ; \
-      echo '! ( rustup toolchain list | grep -q "stable" ) && (rustup toolchain install stable && rustup default stable );' ; \
-      # echo 'eval "$(rustup completions bash rustup)";' ; \
-      # echo 'eval "$(rustup completions bash cargo)";' ; \
-      echo 'export RUSTUP_HOME="${HOME}/.rustup";' ; \
-      echo 'export CARGO_HOME="${HOME}/.cargo";' ; \
-      echo 'export PATH="${PATH}:${CARGO_HOME}/bin";' ; \
-    ) | tee -a "/etc/profile.d/00-rust.sh" > /dev/null ; \
-    # For fixing the following error:
-    # 
-    # ❯ sudo su -
-    # -bash: /etc/bash_completion.d/cargo: No such file or directory
-    [ -d "/usr/share/bash-completion/completions" ] && ( \
-      [ ! -r "/usr/share/bash-completion/completions/cargo" ]  \
-        && rustup completions bash cargo > "/usr/share/bash-completion/completions/cargo" || exit 0 ; \
-      [ ! -r "/usr/share/bash-completion/completions/rustup" ]  \
-        && rustup completions bash rustup > "/usr/share/bash-completion/completions/rustup" || exit 0 ; \
-    ) || exit 0 ;
+    echo '(' ; \
+    echo '  flock -x -n 3 || exit 55 ;' ; \
+    echo '  ! ( rustup toolchain list | grep -q "nightly" ) && rustup toolchain install nightly ;' ; \
+    echo ') 3> "/tmp/rust-nightly.lock"' ; \
+    echo '(' ; \
+    echo '  flock -x -n 4 || exit 55 ;' ; \
+    echo '  ! ( rustup toolchain list | grep -q "stable" ) && (rustup toolchain install stable && rustup default stable );' ; \
+    echo ') 4> "/tmp/rust-stable.lock"' ; \
+    echo '{' ; \
+    echo '  flock -s 3 ;' ; \
+    echo '  flock -u 3 ;' ; \
+    echo '} 3<"/tmp/rust-nightly.lock" ;' ; \
+    echo '{' ; \
+    echo '  flock -s 4 ;' ; \
+    echo '  flock -u 4 ;' ; \
+    echo '  [ -r "/tmp/rust-stable.lock" ] && rm "/tmp/rust-stable.lock" ;' ; \
+    echo '} 4<"/tmp/rust-stable.lock"' ; \
+    echo 'export RUSTUP_HOME="${HOME}/.rustup";' ; \
+    echo 'export CARGO_HOME="${HOME}/.cargo";' ; \
+    echo 'export PATH="${PATH}:${CARGO_HOME}/bin";' ; \
+  ) | tee -a "/etc/profile.d/00-rust.sh" > /dev/null ; \
+  # For fixing the following error:
+  # 
+  # ❯ sudo su -
+  # -bash: /etc/bash_completion.d/cargo: No such file or directory
+  [ -d "/usr/share/bash-completion/completions" ] && ( \
+    [ ! -r "/usr/share/bash-completion/completions/cargo" ]  \
+      && rustup completions bash cargo > "/usr/share/bash-completion/completions/cargo" || exit 0 ; \
+    [ ! -r "/usr/share/bash-completion/completions/rustup" ]  \
+      && rustup completions bash rustup > "/usr/share/bash-completion/completions/rustup" || exit 0 ; \
+  ) || exit 0 ;
+#  ╭──────────────────────────────────────────────────────────╮
+#  │                 install go packages                      │
+#  ╰──────────────────────────────────────────────────────────╯
+USER "root"
+ENV GO111MODULE="on"
+ENV CGO_ENABLED="0"
+ENV CGO_LDFLAGS="-s -w -extldflags '-static'"
+# hadolint ignore=SC2016,SC2076
+RUN \
+  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
+  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
+  pacman --quiet -Syy --noconfirm --needed \
+  "go" "goreleaser" "mage" \
+  && go version > /dev/null 2>&1 \
+  &&  ( \
+  echo 'export PATH="${PATH}:$(go env GOPATH)/bin";' ; \
+  ) | tee "/etc/profile.d/go.sh" > /dev/null || exit 1 ; \
+    SKIP_PKGS=(); \
+  if [ -r "/tmp/.processed-pkgs" ]; then \
+    readarray -t SKIP_PKGS < "/tmp/.processed-pkgs" ; \
+  fi ; \
+  SKIP_PKGS+=("upx"); \
+  PKGS=($(comm -2 -3 <(pacman -Qe | awk '{print $1}'| sort)  <(printf "%s\n" "${SKIP_PKGS[@]}" | sort) )) ; \
+  BIN_LIST=() ; \
+  for pkg in "${PKGS[@]}";do \
+    if [[ ! " ${SKIP_PKGS[*]} " =~ " ${pkg} " ]]; then \
+      SKIP_PKGS+=("${pkg}"); \
+    fi ; \
+    for f in $(pacman -Qql "${pkg}"); do \
+      [ ! -d "${f}" ] && [ -x "${f}" ] \
+      && file -i "${f}" | grep -q -E 'application/x-(pie-)?executable; charset=binary' \
+      && BIN_LIST+=("${f}"); \
+    done ; \
+  done ; \
+  printf "%s\n" "${BIN_LIST[@]}" | xargs -r -I {} -P "$(($(nproc)/4))" upx -q "{}" ; \
+  printf "%s\n" "${SKIP_PKGS[@]}" | tee "/tmp/.processed-pkgs" > /dev/null ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 install lua packages                     │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -451,23 +508,6 @@ RUN \
   "lua" \
   "luajit" \
   "luarocks" ;
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                 install go packages                      │
-#  ╰──────────────────────────────────────────────────────────╯
-USER "root"
-ENV GO111MODULE="on"
-ENV CGO_ENABLED="0"
-ENV CGO_LDFLAGS="-s -w -extldflags '-static'"
-# hadolint ignore=SC2016
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet -Syy --noconfirm --needed \
-  "go" "goreleaser" "mage" \
-  && go version > /dev/null 2>&1 \
-  &&  ( \
-  echo 'export PATH="${PATH}:$(go env GOPATH)/bin";' ; \
-  ) | tee "/etc/profile.d/go.sh" > /dev/null || exit 1 ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 install ruby packages                    │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -542,23 +582,11 @@ RUN \
   "remark-preset-lint-recommended" \
   "remark-lint-list-item-indent" \
   "remark-reference-links" \
-  "standard-readme-spec" \
-  "yo" \
-  "generator-standard-readme" \
   && npm cache clean --quite --force ;
 #  ╭──────────────────────────────────────────────────────────╮
-#  │                    install text editors                  │
+#  │                      text editors                        │
 #  ╰──────────────────────────────────────────────────────────╯
-# pacman -Si helix | awk -F':' '/^ .*: / {print $1}' | sed 's/\s//g'
 USER "root"
-ENV COLORTERM="truecolor"
-ENV EDITOR="nvim"
-ENV VISUAL="nvim"
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet -Syy --noconfirm --needed \
-  "neovim" ;
 # Install language servers
 # hadolint ignore=DL3016,DL3013
 RUN \
@@ -587,56 +615,98 @@ RUN \
   && npm cache clean --quite --force \
   && go clean -modcache \
   && chown "$(id -u "${USER}"):$(id -g "${USER}")" -R "$(go env GOPATH)" "${HOME}" ;
-# Setup Helix installer script
-# hadolint ignore=DL3004,SC2016
-RUN \
-( \
-  echo '#!/usr/bin/env bash' ; \
-  echo 'set -euo pipefail ;' ; \
-  echo '! wget --version > /dev/null 2>&1 && { echo "*** "wget" not found"; exit 1; } ' ; \
-  echo '! jq --version > /dev/null 2>&1 && { echo "*** "jq" not found"; exit 1; } ' ; \
-  echo '! sudo --version > /dev/null 2>&1 && { echo "*** "sudo" not found"; exit 1; } ' ; \
-  echo '! xz --version > /dev/null 2>&1 && { echo "*** "xz" not found"; exit 1; } ' ; \
-  echo '! tar --version > /dev/null 2>&1 && { echo "*** "xz" not found"; exit 1; } ' ; \
-  echo '! xargs --version > /dev/null 2>&1 && { echo "*** "xz" not found"; exit 1; } ' ; \
-  echo 'dir="$(mktemp -d)" ;' ; \
-  echo 'architecture="x86_64"' ; \
-  echo 'wget -qO - "https://api.github.com/repos/helix-editor/helix/releases/latest" \' ; \
-  echo '| jq -r "\' ; \
-  echo '.assets[]|select(\' ; \
-  echo '.browser_download_url \' ; \
-  echo '| (\' ; \
-  echo 'contains(\"${architecture}\") \' ; \
-  echo 'and contains(\"linux\") \' ; \
-  echo 'and contains(\"tar\") \' ; \
-  echo 'and (contains(\"sha256\") | not) \' ; \
-  echo ')).browser_download_url" \' ; \
-  echo '  | xargs -r -I {} wget -O - {} 2> /dev/null \' ; \
-  echo '  | xz -d -c  \' ; \
-  echo '  | tar -xv -C "${dir}" --strip-components=1 ' ; \
-  echo 'chmod +x "${dir}/hx"' ; \
-  echo '[ ! -d "${HOME}/.local/bin" ] && mkdir -p "${HOME}/.local/bin" ;' ; \
-  echo 'mv -f "${dir}/hx" "${HOME}/.local/bin/hx"' ; \
-  echo '[ -d "${HOME}/.config/helix/runtime" ] && sudo rm -r "${HOME}/.config/helix/runtime"' ; \
-  echo 'mkdir -p "${HOME}/.config/helix"' ; \
-  echo 'mv "${dir}/runtime" "${HOME}/.config/helix/runtime"' ; \
-  echo 'hx --version && rm -r "${dir}"' ; \
-  echo 'hx --grammar fetch' ; \
-  echo 'hx --grammar build' ; \
-) | tee "/usr/local/share/install-helix.sh" > /dev/null \
-&& chmod +x "/usr/local/share/install-helix.sh" \
-&& chown "$(id -u "${USER}"):$(id -g "${USER}")" "/usr/local/share/install-helix.sh" \
+#
 # The following logins and runs the command. The login cause rust toolchain to get  
 # Installed which makes the image larger
 # && sudo -i -u "${USER}" bash -c '/usr/local/share/install-helix.sh' \
-&& su-exec "${USER}" '/usr/local/share/install-helix.sh' \
-&& [ -r "${HOME}/.local/bin/hx" ] && ln -sf "${HOME}/.local/bin/hx" "/usr/local/bin/hx"
+#
+# pacman -Si helix | awk -F':' '/^ .*: / {print $1}' | sed 's/\s//g'
+#
+# hadolint ignore=DL3004,SC2016,DL3047
+RUN \
+! wget --version > /dev/null 2>&1 && { echo "*** "wget" not found"; exit 1; } ; \
+! jq --version > /dev/null 2>&1 && { echo "*** "jq" not found"; exit 1; } ; \
+! sudo --version > /dev/null 2>&1 && { echo "*** "sudo" not found"; exit 1; } ; \
+! xz --version > /dev/null 2>&1 && { echo "*** "xz" not found"; exit 1; } ; \
+! tar --version > /dev/null 2>&1 && { echo "*** "tar" not found"; exit 1; } ; \
+! xargs --version > /dev/null 2>&1 && { echo "*** "xargs" not found"; exit 1; } ; \
+dir="$(mktemp -d)" ; \
+architecture="x86_64" ; \
+wget -qO - "https://api.github.com/repos/helix-editor/helix/releases/latest" \
+| jq -r "\
+.assets[]|select(\
+.browser_download_url \
+| (\
+contains(\"${architecture}\") \
+and contains(\"linux\") \
+and contains(\"tar\") \
+and (contains(\"sha256\") | not) \
+)).browser_download_url" \
+  | xargs -r -I {} wget -O - {} 2> /dev/null \
+  | xz -d -c  \
+  | tar -xv -C "${dir}" --strip-components=1 > /dev/null 2>&1 ; \
+chmod +x "${dir}/hx" ; \
+[ ! -d "${HOME}/.local/bin" ] && mkdir -p "${HOME}/.local/bin" ; \
+mv -f "${dir}/hx" "${HOME}/.local/bin/hx" ; \
+[ -d "${HOME}/.config/helix/runtime" ] && rm -r "${HOME}/.config/helix/runtime" ; \
+mkdir -p "${HOME}/.config/helix" \
+&& mv "${dir}/runtime" "${HOME}/.config/helix/runtime" \
+&& ln -sf "${HOME}/.local/bin/hx" "/usr/local/bin/hx" \
+&& rm -r "${dir}" \
+&& chown -R "$(id -u "${USER}"):$(id -g "${USER}")" \
+  "${HOME}/.local/bin" \
+  "${HOME}/.config/helix" \
+&& hx --version > /dev/null 2>&1 && ( \
+  [ ! -d "${HOME}/.init.d/" ] && ( mkdir "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
+  ( \
+    echo '#!/usr/bin/env bash' ; \
+    echo 'if [ ! -d "${HOME}/.config/helix/runtime/grammars/sources" ]; then' ; \
+    echo '  (' ; \
+    echo '    flock -x -n 20 || exit 55 ;' ; \
+    echo '    hx --grammar fetch' ; \
+    echo '    hx --grammar build' ; \
+    echo '  ) 20> "/tmp/helix.lock"' ; \
+    echo '  {' ; \
+    echo '    flock -s 20 ;' ; \
+    echo '    flock -u 20 ;' ; \
+    echo '  } 20<"/tmp/helix.lock"' ; \
+    echo 'fi' ; \
+    echo 'self="$(realpath -s "${BASH_SOURCE[0]}")";' ; \
+    echo 'rm "${self}" ;' ; \
+    echo 'find $(dirname "${self}") -maxdepth 0 -empty -exec rm -r {} \; ;' ; \
+  ) | tee "${HOME}/.init.d/helix-grammar.sh" > /dev/null \
+  && chmod +x "${HOME}/.init.d/helix-grammar.sh" \
+  && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/helix-grammar.sh" \
+) || exit 1
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                  infrustructure as code                  │
 #  ╰──────────────────────────────────────────────────────────╯
 USER "root"
+# Kubernetes
+ADD --chmod=0755 "https://raw.githubusercontent.com/ahmetb/kubectl-aliases/master/.kubectl_aliases" "/etc/profile.d/01-kubectl-aliases.sh"
+# hadolint ignore=SC2016,SC2034,DL3013,DL4006
+RUN \
+  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
+  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
+  pacman --quiet -Syy --noconfirm --needed \
+  "helm" \
+  "kustomize" \
+  "kube-linter" \
+  "kubectl" ; \
+  kubectl version --client=true > /dev/null 2>&1 && ( \
+    echo 'eval "$(kubectl completion bash)" ;' ; \
+  ) | tee -a "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ; \
+  helm version > /dev/null 2>&1 && ( \
+    echo 'eval "$(helm completion bash)" ;' ; \
+  ) | tee -a "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ; \
+  kustomize version > /dev/null 2>&1 && ( \
+    echo 'eval "$(kustomize completion bash)" ;' ; \
+  ) | tee -a "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ; \
+  kube-linter version > /dev/null 2>&1 && ( \
+    echo 'eval "$(kube-linter completion bash)" ;' ; \
+  ) | tee -a "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ;
 # hashicorp
-# hadolint ignore=SC2034,DL3013,DL4006
+# hadolint ignore=SC2016,SC2034,DL3013,DL4006
 RUN \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
@@ -648,13 +718,6 @@ RUN \
   "https://aur.archlinux.org/tfsec-bin.git" \
   "https://aur.archlinux.org/tflint-bin.git" \
   "https://aur.archlinux.org/terrascan.git" \
-  ) ; \
-  TFLINT_PLUGINS_RELEASES_URLS=( \
-    "https://api.github.com/repos/terraform-linters/tflint-ruleset-terraform/releases/latest" \
-    "https://api.github.com/repos/terraform-linters/tflint-ruleset-opa/releases/latest" \
-    "https://api.github.com/repos/terraform-linters/tflint-ruleset-aws/releases/latest" \
-    "https://api.github.com/repos/terraform-linters/tflint-ruleset-azurerm/releases/latest" \
-    "https://api.github.com/repos/terraform-linters/tflint-ruleset-google/releases/latest" \
   ) ; \
   GROUPS_ARR=( \
     "tfenv" \
@@ -681,24 +744,76 @@ RUN \
   for group in "${GROUPS_ARR[@]}";do \
     getent group "${group}" > /dev/null 2>&1 && usermod -aG "${group}" "${USER}" || continue ; \
   done ; \
-  # Setup TFlint plugins
-  mkdir -p "${HOME}/.tflint.d/plugins" ; \
-  architecture="amd64" ; \
-  for url in "${TFLINT_PLUGINS_RELEASES_URLS[@]}";do \
-    wget -qO - "$url" \
-    | jq -r "\
-    .assets[]|select(\
-    .browser_download_url \
-    | (\
-    contains(\"${architecture}\") \
-    and contains(\"linux\") \
-    and (contains(\"sha256\") | not) \
-    )).browser_download_url" \
-    | xargs -r -I {} wget -qO - {} 2> /dev/null \
-    | bsdtar -xvf- -C "${HOME}/.tflint.d/plugins" ; \
+  SKIP_PKGS=(); \
+  if [ -r "/tmp/.processed-pkgs" ]; then \
+    readarray -t SKIP_PKGS < "/tmp/.processed-pkgs" ; \
+  fi ; \
+  SKIP_PKGS+=("upx"); \
+  PKGS=($(comm -2 -3 <(pacman -Qe | awk '{print $1}'| sort)  <(printf "%s\n" "${SKIP_PKGS[@]}" | sort) )) ; \
+  BIN_LIST=() ; \
+  for pkg in "${PKGS[@]}";do \
+    if [[ ! " ${SKIP_PKGS[*]} " =~ " ${pkg} " ]]; then \
+      SKIP_PKGS+=("${pkg}"); \
+    fi ; \
+    for f in $(pacman -Qql "${pkg}"); do \
+      [ ! -d "${f}" ] && [ -x "${f}" ] \
+      && file -i "${f}" | grep -q -E 'application/x-(pie-)?executable; charset=binary' \
+      && BIN_LIST+=("${f}"); \
+    done ; \
   done ; \
-  find "${HOME}/.tflint.d/plugins" -type f -exec chmod +x {} \; ; \
-  chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.tflint.d" ; \
+  printf "%s\n" "${BIN_LIST[@]}" | xargs -r -I {} -P "$(($(nproc)/4))" upx -q "{}" ; \
+  printf "%s\n" "${SKIP_PKGS[@]}" | tee "/tmp/.processed-pkgs" > /dev/null ; \
+  # https://jdimpson.livejournal.com/5685.html
+  # https://stackoverflow.com/questions/8295908/how-to-use-a-variable-to-indicate-a-file-descriptor-in-bash
+  tflint --version > /dev/null 2>&1 && ( \
+    [ ! -d "${HOME}/.init.d/" ] && ( mkdir "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
+    ( \
+      echo '#!/usr/bin/env bash' ; \
+      echo '  TFLINT_PLUGINS=(' ; \
+      echo '  "tflint-ruleset-opa"' ; \
+      echo '  "tflint-ruleset-aws"' ; \
+      echo '  "tflint-ruleset-azurerm"' ; \
+      echo '  "tflint-ruleset-google"' ; \
+      echo ') ;' ; \
+      echo 'architecture="amd64" ;' ; \
+      echo '[ ! -d "${HOME}/.tflint.d/plugins" ] && mkdir -p "${HOME}/.tflint.d/plugins" ;' ; \
+      echo 'for index in "${!TFLINT_PLUGINS[@]}"; do' ; \
+      echo '  plugin="${TFLINT_PLUGINS[$index]}" ;' ; \
+      echo '  if [ ! -r "${HOME}/.tflint.d/plugins/${plugin}" ];then' ; \
+      echo '    fd="$((index +10 ))";' ; \
+      echo '    exec {fd}<>"/tmp/tflint-${plugin}.lock"' ; \
+      echo '    echo "*** Installing ${plugin} ..."' ; \
+      echo '    (' ; \
+      echo '      flock -x -n "${fd}" || exit 55 ;' ; \
+      echo '      url="https://api.github.com/repos/terraform-linters/${plugin}/releases/latest" ;' ; \
+      echo '      wget -qO - "${url}" \' ; \
+      echo '      | jq -r "\' ; \
+      echo '      .assets[]|select(\' ; \
+      echo '      .browser_download_url \' ; \
+      echo '      | (\' ; \
+      echo '      contains(\"${architecture}\") \' ; \
+      echo '      and contains(\"linux\") \' ; \
+      echo '      and (contains(\"sha256\") | not) \' ; \
+      echo '      )).browser_download_url" \' ; \
+      echo '      | xargs -r -I {} wget -qO - {} 2> /dev/null \' ; \
+      echo '      | bsdtar -xvf- -C "${HOME}/.tflint.d/plugins" > /dev/null 2>&1 ;' ; \
+      echo '    ) >&${fd}' ; \
+      echo '    {' ; \
+      echo '      flock -s "${fd}" ;' ; \
+      echo '      echo "*** ${plugin} installed "' ; \
+      echo '      chmod +x "${HOME}/.tflint.d/plugins/${plugin}" ;' ; \
+      echo '      flock -u "${fd}" ;' ; \
+      echo '      [ -r "/tmp/tflint-${plugin}.lock" ] && rm "/tmp/tflint-${plugin}.lock" ;' ; \
+      echo '    } <&${fd}' ; \
+      echo '  fi' ; \
+      echo 'done ;' ; \
+      echo 'self="$(realpath -s "${BASH_SOURCE[0]}")";' ; \
+      echo 'rm "${self}" ;' ; \
+      echo 'find $(dirname "${self}") -maxdepth 0 -empty -exec rm -r {} \; ;' ; \
+    ) | tee "${HOME}/.init.d/tflint.sh" > /dev/null \
+    && chmod +x "${HOME}/.init.d/tflint.sh" \
+    && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/tflint.sh"  ; \
+  ) || exit 1 ; \
   tfenv --version >/dev/null 2>&1 && ( \
     tfenv install "latest" \
     && tfenv use "latest" ; \
@@ -706,31 +821,8 @@ RUN \
   terraform-docs version > /dev/null 2>&1 && ( \
     echo 'eval "$(terraform-docs completion bash)" ;' ; \
   ) | tee "/etc/profile.d/terraform.sh" > /dev/null || exit 1 ; 
-# Kubernetes
-ADD --chmod=0755 "https://raw.githubusercontent.com/ahmetb/kubectl-aliases/master/.kubectl_aliases" "/etc/profile.d/01-kubectl-aliases.sh"
-# hadolint ignore=SC2034,DL3013,DL4006
-RUN \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  pacman --quiet -Syy --noconfirm --needed \
-  "helm" \
-  "kustomize" \
-  "kube-linter" \
-  "kubectl" ; \
-  kubectl version --client=true > /dev/null 2>&1 && ( \
-    echo 'eval "$(kubectl completion bash)" ;' ; \
-  ) | tee -a "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ; \
-  helm version > /dev/null 2>&1 && ( \
-    echo 'eval "$(helm completion bash)" ;' ; \
-  ) | tee -a "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ; \
-  kustomize version > /dev/null 2>&1 && ( \
-    echo 'eval "$(kustomize completion bash)" ;' ; \
-  ) | tee -a "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ; \
-  kube-linter version > /dev/null 2>&1 && ( \
-    echo 'eval "$(kube-linter completion bash)" ;' ; \
-  ) | tee -a "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ;
 # Generic
-# hadolint ignore=SC2034,DL3013,DL4006
+# hadolint ignore=SC2034,DL3013,DL4006,SC2016
 RUN \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
@@ -747,8 +839,6 @@ RUN \
   "https://aur.archlinux.org/envoyproxy-bin.git" \
   "https://aur.archlinux.org/gojira.git" \
   "https://aur.archlinux.org/litmusctl.git" \
-  # ansible
-  "https://aur.archlinux.org/ansible-completion-git.git" \
   ) ; \
   GROUPS_ARR=( \
     "caddy" \
@@ -761,7 +851,6 @@ RUN \
   "istio" \
   "caddy" \
   "traefik" \
-  "ansible" \
   "aws-cli-v2" ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
     git clone "${url}" "/tmp/"$(basename "${url%.git}")"" \
@@ -775,6 +864,25 @@ RUN \
     go clean -cache ; \
     su-exec "${USER}" go clean -cache ; \
   done ; \
+  SKIP_PKGS=(); \
+  if [ -r "/tmp/.processed-pkgs" ]; then \
+    readarray -t SKIP_PKGS < "/tmp/.processed-pkgs" ; \
+  fi ; \
+  SKIP_PKGS+=("upx"); \
+  PKGS=($(comm -2 -3 <(pacman -Qe | awk '{print $1}'| sort)  <(printf "%s\n" "${SKIP_PKGS[@]}" | sort) )) ; \
+  BIN_LIST=() ; \
+  for pkg in "${PKGS[@]}";do \
+    if [[ ! " ${SKIP_PKGS[*]} " =~ " ${pkg} " ]]; then \
+      SKIP_PKGS+=("${pkg}"); \
+    fi ; \
+    for f in $(pacman -Qql "${pkg}"); do \
+      [ ! -d "${f}" ] && [ -x "${f}" ] \
+      && file -i "${f}" | grep -q -E 'application/x-(pie-)?executable; charset=binary' \
+      && BIN_LIST+=("${f}"); \
+    done ; \
+  done ; \
+  printf "%s\n" "${BIN_LIST[@]}" | xargs -r -I {} -P "$(($(nproc)/4))" upx -q "{}" ; \
+  printf "%s\n" "${SKIP_PKGS[@]}" | tee "/tmp/.processed-pkgs" > /dev/null ; \
   for group in "${GROUPS_ARR[@]}";do \
     getent group "${group}" > /dev/null 2>&1 && usermod -aG "${group}" "${USER}" || continue ; \
   done ; \
@@ -829,6 +937,7 @@ RUN \
   echo 'exit 0 ;' ; \
 ) | tee /usr/local/share/fix-ssh-permissions.sh > /dev/null \
 && chmod +x /usr/local/share/fix-ssh-permissions.sh  ;
+# hadolint ignore=SC2016,SC2046
 RUN \
   ln -sf "/usr/share/zoneinfo/America/New_York" "/etc/localtime" ; \
   chown "$(id -u "${USER}"):$(id -g "${USER}")" -R  "${WORKDIR}" "${HOME}" ; \
@@ -844,6 +953,7 @@ RUN \
 #  ╰──────────────────────────────────────────────────────────╯
 # https://gist.github.com/b01/0a16b6645ab7921b0910603dfb85e4fb
 USER "root"
+# hadolint ignore=DL4001
 RUN \
     ARCH="x64" ; \
     tag="$(curl --silent "https://api.github.com/repos/microsoft/vscode/releases/latest" \
@@ -907,18 +1017,21 @@ RUN \
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                    Entrypoint script                     │
 #  ╰──────────────────────────────────────────────────────────╯
+# hadolint ignore=SC2016
 RUN \
   ( \
-  echo '#!/bin/sh' ; \
-  echo '[ -r "/usr/local/share/docker-from-docker.sh" ] && bash "/usr/local/share/docker-from-docker.sh"' ; \
-  echo '[ -r "/usr/local/share/kary-comments.sh" ] && bash "/usr/local/share/kary-comments.sh"' ; \
-  echo '[ -r "/usr/local/share/fix-ssh-permissions.sh" ] && bash "/usr/local/share/fix-ssh-permissions.sh"' ; \
-  echo 'exec "$@"' ; \
+    echo '#!/bin/sh' ; \
+    echo '[ -r "/usr/local/share/docker-from-docker.sh" ] && bash "/usr/local/share/docker-from-docker.sh" ;' ; \
+    echo '[ -r "/usr/local/share/kary-comments.sh" ] && bash "/usr/local/share/kary-comments.sh" ;' ; \
+    echo '[ -r "/usr/local/share/fix-ssh-permissions.sh" ] && bash "/usr/local/share/fix-ssh-permissions.sh" ;' ; \
+    echo '[ -d "${HOME}/.init.d" ] && find "${HOME}/.init.d" -type f -name "*.sh" | xargs -r -I {} -P "$(nproc)" bash "{}" ;' ; \
+    echo 'exec "$@"' ; \
   ) | tee '/entrypoint' > /dev/null \
   && chmod +x '/entrypoint' \
   && chown "$(id -u "${USER}"):$(id -g "${USER}")" '/entrypoint';
+RUN du --human-readable --max-depth 1 "${HOME}" > /.size
 USER "${USER}"
-VOLUME ["${HOME}","${WORKDIR}}"]
+VOLUME ["${HOME}","${WORKDIR}"]
 ENV TERM="xterm"
 ENV DOCKER_BUILDKIT="1"
 ENV BUILDKIT_PROGRESS="plain"
