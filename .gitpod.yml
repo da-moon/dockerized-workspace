@@ -73,6 +73,9 @@ tasks:
       set -euo pipefail ;
       echo "${DOCKER_PASSWORD}" \
       | docker login --username "${DOCKER_USERNAME}" --password-stdin
+      # NOTE: Gitpod buildx cache persists workspace reboots which can cause
+      # the workspace to run out of space
+      docker buildx prune --builder default --all --force ;
       docker buildx create \
         --use \
         --name "$(basename -s ".git" "$(git remote get-url origin)")" \
