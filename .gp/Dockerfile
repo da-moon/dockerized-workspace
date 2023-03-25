@@ -917,6 +917,14 @@ RUN \
   echo "  MACs hmac-sha2-512" ; \
   echo "  UserKnownHostsFile=/dev/null" ; \
   echo "  IdentityFile=~/.ssh/id_rsa_sourcehut" ; \
+  echo "Host mpr" ; \
+  echo "  HostName mpr.hunterwittenborn.com" ; \
+  echo "  IdentityFile ~/.ssh/id_rsa_makedeb" ; \
+  echo "  User mpr" ; \
+  echo "  IdentitiesOnly yes" ; \
+  echo "  StrictHostKeyChecking no" ; \
+  echo "  MACs hmac-sha2-512" ; \
+  echo "  UserKnownHostsFile=/dev/null" ; \
   ) | tee "${HOME}/.ssh/config" > /dev/null \
   && chmod 644 "${HOME}/.ssh/config" ;
 #  ╭──────────────────────────────────────────────────────────╮
