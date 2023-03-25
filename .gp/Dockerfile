@@ -120,6 +120,7 @@ RUN \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   pacman --quiet -Syy --noconfirm --needed \
   "openssh" \
+  "rsync" \
   "man-db" \
   "wget" \
   "curl" \
@@ -673,7 +674,6 @@ mkdir -p "${HOME}/.config/helix" \
     echo 'fi' ; \
     echo 'self="$(realpath -s "${BASH_SOURCE[0]}")";' ; \
     echo 'rm "${self}" ;' ; \
-    echo 'find $(dirname "${self}") -maxdepth 0 -empty -exec rm -r {} \; ;' ; \
   ) | tee "${HOME}/.init.d/helix-grammar.sh" > /dev/null \
   && chmod +x "${HOME}/.init.d/helix-grammar.sh" \
   && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/helix-grammar.sh" \
@@ -809,7 +809,6 @@ RUN \
       echo 'done ;' ; \
       echo 'self="$(realpath -s "${BASH_SOURCE[0]}")";' ; \
       echo 'rm "${self}" ;' ; \
-      echo 'find $(dirname "${self}") -maxdepth 0 -empty -exec rm -r {} \; ;' ; \
     ) | tee "${HOME}/.init.d/tflint.sh" > /dev/null \
     && chmod +x "${HOME}/.init.d/tflint.sh" \
     && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/tflint.sh"  ; \
@@ -906,7 +905,7 @@ ENV WORKDIR "${WORKDIR}"
 WORKDIR "${WORKDIR}"
 RUN \
   ( \
-  echo "[ -r '/entrypoint' ] && /entrypoint bash --login" ; \
+    echo '[ -r "/entrypoint" ] && exec /entrypoint bash --login' ; \
   ) | tee "${HOME}/.bashrc" > /dev/null ; \
   # ─── SSH SETUP ──────────────────────────────────────────────────────────────────
   mkdir -p "${HOME}/.ssh" \
@@ -1024,7 +1023,10 @@ RUN \
     echo '[ -r "/usr/local/share/docker-from-docker.sh" ] && bash "/usr/local/share/docker-from-docker.sh" ;' ; \
     echo '[ -r "/usr/local/share/kary-comments.sh" ] && bash "/usr/local/share/kary-comments.sh" ;' ; \
     echo '[ -r "/usr/local/share/fix-ssh-permissions.sh" ] && bash "/usr/local/share/fix-ssh-permissions.sh" ;' ; \
-    echo '[ -d "${HOME}/.init.d" ] && find "${HOME}/.init.d" -type f -name "*.sh" | xargs -r -I {} -P "$(nproc)" bash "{}" ;' ; \
+    echo '[ -d "${HOME}/.init.d" ] && (' ; \
+    echo '  find "${HOME}/.init.d" -type f -name "*.sh" | xargs -r -I {} -P "$(nproc)" bash "{}" ;' ; \
+    echo '  find "${HOME}/.init.d" -maxdepth 0 -empty -exec rm -r {} \; ;' ; \
+    echo ');' ; \
     echo 'exec "$@"' ; \
   ) | tee '/entrypoint' > /dev/null \
   && chmod +x '/entrypoint' \
