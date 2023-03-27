@@ -444,8 +444,9 @@ RUN \
     echo '{' ; \
     echo '  flock -s 4 ;' ; \
     echo '  flock -u 4 ;' ; \
-    echo '  [ -r "/tmp/rust-stable.lock" ] && rm "/tmp/rust-stable.lock" ;' ; \
     echo '} 4<"/tmp/rust-stable.lock"' ; \
+    echo '[ -r "/tmp/rust-nightly.lock" ] && rm "/tmp/rust-nightly.lock" ;' ; \
+    echo '[ -r "/tmp/rust-stable.lock" ] && rm "/tmp/rust-stable.lock" ;' ; \
     echo 'export RUSTUP_HOME="${HOME}/.rustup";' ; \
     echo 'export CARGO_HOME="${HOME}/.cargo";' ; \
     echo 'export PATH="${PATH}:${CARGO_HOME}/bin";' ; \
@@ -662,18 +663,22 @@ mkdir -p "${HOME}/.config/helix" \
   ( \
     echo '#!/usr/bin/env bash' ; \
     echo 'if [ ! -d "${HOME}/.config/helix/runtime/grammars/sources" ]; then' ; \
+    echo '  self="$(realpath -s "${BASH_SOURCE[0]}")";' ; \
+    echo '  lockfile="/tmp/$(basename -s.sh "${self}").lock" ;' ; \
     echo '  (' ; \
     echo '    flock -x -n 20 || exit 55 ;' ; \
-    echo '    hx --grammar fetch' ; \
-    echo '    hx --grammar build' ; \
-    echo '  ) 20> "/tmp/helix.lock"' ; \
+    echo '    echo "+++ building grammar"' ; \
+    echo '    # hx --grammar fetch' ; \
+    echo '    # hx --grammar build' ; \
+    echo '  ) 20> "${lockfile}"' ; \
     echo '  {' ; \
     echo '    flock -s 20 ;' ; \
+    echo '    echo "[ $(basename -s.sh "${self}") ] : cleaning up self..." ;' ; \
     echo '    flock -u 20 ;' ; \
-    echo '  } 20<"/tmp/helix.lock"' ; \
+    echo '    rm "${self}" ;' ; \
+    echo '  } 20<"${lockfile}"' ; \
+    echo '  [ -r "${lockfile}" ] && rm "${lockfile}" ;' ; \
     echo 'fi' ; \
-    echo 'self="$(realpath -s "${BASH_SOURCE[0]}")";' ; \
-    echo 'rm "${self}" ;' ; \
   ) | tee "${HOME}/.init.d/helix-grammar.sh" > /dev/null \
   && chmod +x "${HOME}/.init.d/helix-grammar.sh" \
   && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/helix-grammar.sh" \
@@ -769,6 +774,7 @@ RUN \
     [ ! -d "${HOME}/.init.d/" ] && ( mkdir "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
     ( \
       echo '#!/usr/bin/env bash' ; \
+      echo 'self="$(realpath -s "${BASH_SOURCE[0]}")";' ; \
       echo '  TFLINT_PLUGINS=(' ; \
       echo '  "tflint-ruleset-opa"' ; \
       echo '  "tflint-ruleset-aws"' ; \
@@ -780,8 +786,9 @@ RUN \
       echo 'for index in "${!TFLINT_PLUGINS[@]}"; do' ; \
       echo '  plugin="${TFLINT_PLUGINS[$index]}" ;' ; \
       echo '  if [ ! -r "${HOME}/.tflint.d/plugins/${plugin}" ];then' ; \
-      echo '    fd="$((index +10 ))";' ; \
-      echo '    exec {fd}<>"/tmp/tflint-${plugin}.lock"' ; \
+      echo '    lockfile="/tmp/${plugin}.lock" ;' ; \
+      echo '    fd="$((0x$(echo "${plugin}" | md5sum | cut -f 1 -d " " | cut -c 1-2)))" ;' ; \
+      echo '    exec {fd}<>"${lockfile}"' ; \
       echo '    echo "*** Installing ${plugin} ..."' ; \
       echo '    (' ; \
       echo '      flock -x -n "${fd}" || exit 55 ;' ; \
@@ -803,11 +810,10 @@ RUN \
       echo '      echo "*** ${plugin} installed "' ; \
       echo '      chmod +x "${HOME}/.tflint.d/plugins/${plugin}" ;' ; \
       echo '      flock -u "${fd}" ;' ; \
-      echo '      [ -r "/tmp/tflint-${plugin}.lock" ] && rm "/tmp/tflint-${plugin}.lock" ;' ; \
       echo '    } <&${fd}' ; \
+      echo '    [ -r "${lockfile}" ] && rm "${lockfile}" ;' ; \
       echo '  fi' ; \
       echo 'done ;' ; \
-      echo 'self="$(realpath -s "${BASH_SOURCE[0]}")";' ; \
       echo 'rm "${self}" ;' ; \
     ) | tee "${HOME}/.init.d/tflint.sh" > /dev/null \
     && chmod +x "${HOME}/.init.d/tflint.sh" \
@@ -1033,7 +1039,8 @@ RUN \
     echo '[ -r "/usr/local/share/fix-ssh-permissions.sh" ] && bash "/usr/local/share/fix-ssh-permissions.sh" ;' ; \
     echo '[ -d "${HOME}/.init.d" ] && (' ; \
     echo '  find "${HOME}/.init.d" -type f -name "*.sh" | xargs -r -I {} -P "$(nproc)" bash "{}" ;' ; \
-    echo '  find "${HOME}/.init.d" -maxdepth 0 -empty -exec rm -r {} \; ;' ; \
+    # TODO: add a lock and delete only after init is complete
+    # echo '  find "${HOME}/.init.d" -maxdepth 0 -empty -exec rm -r {} \; ;' ; \
     echo ');' ; \
     echo 'exec "$@"' ; \
   ) | tee '/entrypoint' > /dev/null \
