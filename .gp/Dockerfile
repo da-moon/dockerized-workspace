@@ -15,7 +15,7 @@ ENV HOME="/home/${USER}"
 # hadolint ignore=DL3059
 RUN \
   pacman-key --init \
-  && pacman-key --populate "archlinux" \
+  && pacman-key --populate "archlinux" ;
 # Polar Repo
 RUN \
   pacman-key --keyserver "hkps://keys.openpgp.org" --recv-key "D7E35661EB1A280A" \
