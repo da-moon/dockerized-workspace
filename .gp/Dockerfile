@@ -13,38 +13,57 @@ ENV HOME="/home/${USER}"
 #  │                      initial setup                       │
 #  ╰──────────────────────────────────────────────────────────╯
 # hadolint ignore=DL3059
-RUN pacman-key --init ;
-# hadolint ignore=DL3059
-RUN pacman-key --populate "archlinux";
+RUN \
+  pacman-key --init \
+  && pacman-key --populate "archlinux" \
+# Polar Repo
+RUN \
+  pacman-key --keyserver "hkps://keys.openpgp.org" --recv-key "D7E35661EB1A280A" \
+  && pacman-key --lsign-key "D7E35661EB1A280A" \
+  && ( \
+    echo '[polarrepo]' ; \
+    echo 'Server = https://polarrepo.polarian.dev' ; \
+  ) | tee -a "/etc/pacman.conf" > /dev/null ;
+# Chaotic-AUR
+RUN \
+  pacman-key --recv-key "FBA220DFC880C036" --keyserver "keyserver.ubuntu.com" \
+  && pacman-key --lsign-key "FBA220DFC880C036" \
+  && pacman -U --noconfirm \
+    'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' \
+    'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' \
+  && ( \
+    echo '[chaotic-aur]' ; \
+    echo 'Include = /etc/pacman.d/chaotic-mirrorlist' ; \
+  ) | tee -a "/etc/pacman.conf" > /dev/null ;
 RUN \
   # ─── DOWNLOAD SIXTEEN PACKAGES CONCURRENTLY ─────────────────────────────────────
   sed -i \
   -e "/ParallelDownloads/d" \
   -e  '/\[options\]/a ParallelDownloads = 16' \
-  "/etc/pacman.conf" \
+  "/etc/pacman.conf" ; \
   # ─── USE PACMAN AVATAR FOR SHOWING PROGRESS ─────────────────────────────────────
-  && sed -i \
+  sed -i \
   -e "/Color/d" \
   -e "/ILoveCandy/d" \
   -e '/\[options\]/a Color' \
   -e '/\[options\]/a ILoveCandy' \
-  "/etc/pacman.conf" \
+  "/etc/pacman.conf" ; \
   # https://www.reddit.com/r/archlinux/comments/3ctiou/lpt_speed_up_makepkg_by_skippingparallelizing/
-  && sed -i \
+  sed -i \
     # skip running tests
     -e 's/ check / !check /g' \
     # use multiple cores 
     -e 's/COMPRESSXZ.*/COMPRESSXZ=(xz -T 0 -c -z -)/g' \
     # skip compression
     -e "s/PKGEXT.*/PKGEXT='.pkg.tar'/g" \
-    "/etc/makepkg.conf" \
-  && ( \
-  # we use this to update installed packages one time after container starts. this
-  # gets executed whe the first shell is opened. This approach is to make the
-  # docker images as small as possible since upgrading all packages creates large
-  # diffs and large image sizes
-  echo '[ ! -r "/.pacman-update" ] && ( sudo pacman --quiet -Syyu --noconfirm && sudo touch "/.pacman-update" )' ; \
-  echo 'alias pacman="sudo pacman"' ; \
+    "/etc/makepkg.conf" ; \
+  ( \
+    # we use this to update installed packages one time after container starts. this
+    # gets executed whe the first shell is opened. This approach is to make the
+    # docker images as small as possible since upgrading all packages creates large
+    # diffs and large image sizes
+    echo '[ ! -r "/.pacman-update" ] && ( sudo pacman --quiet -Syyu --noconfirm && sudo touch "/.pacman-update" )' ; \
+    echo 'alias pacman="sudo pacman"' ; \
   ) | tee "/etc/profile.d/pacman.sh" > /dev/null ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 finding fastest sources                  │
@@ -850,13 +869,16 @@ RUN \
     "traefik" \
   ) ; \
   pacman --quiet -Syy --noconfirm --needed \
-  "cfssl" \
+    "polarrepo/google-cloud-cli" \
+    "chaotic-aur/azure-cli" ; \
+  pacman --quiet -Syy --noconfirm --needed \
+  "aws-cli-v2" \
   "vector" \
   "pulumi" \
   "istio" \
   "caddy" \
-  "traefik" \
-  "aws-cli-v2" ; \
+  "traefik" \ 
+  "cfssl" ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
     git clone "${url}" "/tmp/"$(basename "${url%.git}")"" \
     && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
