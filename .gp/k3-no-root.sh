@@ -110,8 +110,6 @@ users:
       - wheel
       - sudo
       - adm
-    sudo: 
-      - ALL=(ALL) NOPASSWD:ALL
     shell: /bin/bash
     # shell: "/usr/bin/zsh"
     # ssh_authorized_keys:
