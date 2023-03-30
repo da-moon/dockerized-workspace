@@ -26,6 +26,10 @@ if [ "$(command -v "pacman")" != "" ];then
 	if [ "$(command -v "socat")" == "" ];then
 		sudo pacman --quiet -Syy --noconfirm "socat" ;
 	fi
+	# TODO: remove this once ssh is fixed
+	if [ "$(command -v "sshpass")" == "" ];then
+		sudo pacman --quiet -Syy --noconfirm "sshpass" ;
+	fi
 fi
 # Ensuring required binaries exist
 if [ "$(command -v "xorriso")" == "" ];then
@@ -51,8 +55,8 @@ if [ "$(command -v "wget")" == "" ] && [ "$(command -v "aria2c")" == "" ];then
 	echo "*** "wget" not found in PATH. please install it before running this script"
 	exit 1
 fi
-
-# rm -rf "${dir}" ;
+# TODO: remove this once everythning is fixed
+rm -rf "${dir}" ;
 [ ! -p "${dir}" ] && mkdir -p "${dir}"
 
 pushd "${dir}" > /dev/null 2>&1 ;
@@ -82,6 +86,7 @@ if [ ! -r "${iso}" ]; then
 # ssh_pwauth: false
 # NOTE: location in guest
 # sudo cat /var/lib/cloud/instance/user-data.txt
+# sudo cat /var/lib/cloud/instances/nocloud/cloud-config.txt
 	cat << EOF | tee "${dir}/user-data" > /dev/null
 #cloud-config
 output: {all: '| tee -a /var/log/cloud-init-output.log'}
@@ -111,9 +116,8 @@ users:
       - sudo
       - adm
     shell: /bin/bash
-    # shell: "/usr/bin/zsh"
-    # ssh_authorized_keys:
-    #   - $(cat "${HOME}/.ssh/id_rsa.pub")
+    ssh_authorized_keys:
+      - $(cat "${HOME}/.ssh/id_rsa.pub")
 packages:
   - zsh
 write_files:
@@ -133,8 +137,6 @@ write_files:
       PasswordAuthentication            yes
 runcmd:
   - printenv > /tmp/env.txt
-  # - systemctl restart sshd
-  # - systemctl enable sshd
 EOF
 	if [ "$(command -v "yamlfmt")" != "" ];then
 		yamlfmt "${dir}/user-data"
@@ -178,11 +180,10 @@ echo "*** starting "${VM_NAME}" archlinux VM with "qemu". It can take up to ten 
 # ps -eo comm | grep ^qemu-vm-
 # 
 # ──────────────────────────────────────────────────────────────────────────────
-# get a shell inside the VM after launcing it through UNIX socker
+# interact with qemu-monitor through UNIX socket
 # https://unix.stackexchange.com/questions/426652/connect-to-running-qemu-instance-with-qemu-monitor
 #
 # socat -,echo=0,icanon=0 unix-connect:/tmp/qemu-monitor-socket
-socat -,echo=0,icanon=0 unix-connect:qemu-monitor-socket
 # ──────────────────────────────────────────────────────────────────────────────
 # share host files into guest
 # https://www.linux-kvm.org/page/9p_virtio
@@ -194,11 +195,12 @@ socat -,echo=0,icanon=0 unix-connect:qemu-monitor-socket
 # 
 # ssh -p 2222 -m "hmac-sha2-512" -o "StrictHostKeyChecking=no" -o "CheckHostIP=no" -o "UserKnownHostsFile=/dev/null" 127.0.0.1
 # ──────────────────────────────────────────────────────────────────────────────
+# -nographic `# disable graphical output and redirect serial I/Os to console` \
+# -serial "mon:stdio" `# get ctrl-c to work` \
 qemu-system-x86_64 \
-	-serial "mon:stdio" `# get ctrl-c to work` \
-	-nographic `# disable graphical output and redirect serial I/Os to console` \
+	-daemonize \
 	-display "none" \
-	-monitor unix:/tmp/qemu-monitor-socket,server,nowait `# allow one to get shell in Qemu through UNIX socket` \
+	-monitor unix:/tmp/qemu-monitor-socket,server,nowait `# allow one to interact with qemu-monitor through UNIX socket` \
 	-boot order=d  `# boot from cdrom` \
 	-cdrom "${iso}" \
 	-net user `# configure netwrok interface` \
@@ -209,3 +211,26 @@ qemu-system-x86_64 \
 	-name "${VM_NAME},process=qemu-vm-${VM_NAME}"  \
 	"${qcow}" ;
 
+printf "Waiting for SSH to become available ..."
+
+until sshpass -p 'arch' ssh \
+		-p 2222 \
+		-m "hmac-sha2-512" \
+		-o "StrictHostKeyChecking=no" \
+		-o "CheckHostIP=no" \
+		-o "UserKnownHostsFile=/dev/null" \
+		-t "whoami && exit" \
+		"arch@127.0.0.1"  &>/dev/null; do
+	printf "."
+	sleep 2
+done
+printf "Waiting unitl cloud-init is done configuring "${VM_NAME}" Guest ..."
+sshpass -p 'arch' ssh \
+		-p 2222 \
+		-m "hmac-sha2-512" \
+		-o "StrictHostKeyChecking=no" \
+		-o "CheckHostIP=no" \
+		-o "UserKnownHostsFile=/dev/null" \
+		-t "cloud-init status --wait" \
+		"arch@127.0.0.1" ;
+printf ""${VM_NAME}" Guest is ready ..."
