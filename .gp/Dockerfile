@@ -52,7 +52,7 @@ RUN \
   sed -i \
     # skip running tests
     -e 's/ check / !check /g' \
-    # use multiple cores 
+    # use multiple cores
     -e 's/COMPRESSXZ.*/COMPRESSXZ=(xz -T 0 -c -z -)/g' \
     # skip compression
     -e "s/PKGEXT.*/PKGEXT='.pkg.tar'/g" \
@@ -114,7 +114,7 @@ RUN \
   && usermod -aG wheel,root,sudo "${USER}" \
   # ─── ENSURE USER HOME HAS THE RIGHT OWNERSHIP ───────────────────────────────────
   && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}" -R
-  
+
 #  ╭──────────────────────────────────────────────────────────╮
 #  │              install makepkg dependencies                │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -471,7 +471,7 @@ RUN \
     echo 'export PATH="${PATH}:${CARGO_HOME}/bin";' ; \
   ) | tee -a "/etc/profile.d/00-rust.sh" > /dev/null ; \
   # For fixing the following error:
-  # 
+  #
   # ❯ sudo su -
   # -bash: /etc/bash_completion.d/cargo: No such file or directory
   [ -d "/usr/share/bash-completion/completions" ] && ( \
@@ -637,7 +637,7 @@ RUN \
   && go clean -modcache \
   && chown "$(id -u "${USER}"):$(id -g "${USER}")" -R "$(go env GOPATH)" "${HOME}" ;
 #
-# The following logins and runs the command. The login cause rust toolchain to get  
+# The following logins and runs the command. The login cause rust toolchain to get
 # Installed which makes the image larger
 # && sudo -i -u "${USER}" bash -c '/usr/local/share/install-helix.sh' \
 #
@@ -674,6 +674,7 @@ mkdir -p "${HOME}/.config/helix" \
 && mv "${dir}/runtime" "${HOME}/.config/helix/runtime" \
 && ln -sf "${HOME}/.local/bin/hx" "/usr/local/bin/hx" \
 && rm -r "${dir}" \
+&& wget -qO "${HOME}/.config/helix/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/helix/config.toml" \
 && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" \
   "${HOME}/.local/bin" \
   "${HOME}/.config/helix" \
@@ -844,7 +845,7 @@ RUN \
   ) ; \
   terraform-docs version > /dev/null 2>&1 && ( \
     echo 'eval "$(terraform-docs completion bash)" ;' ; \
-  ) | tee "/etc/profile.d/terraform.sh" > /dev/null || exit 1 ; 
+  ) | tee "/etc/profile.d/terraform.sh" > /dev/null || exit 1 ;
 # Generic
 # hadolint ignore=SC2034,DL3013,DL4006,SC2016
 RUN \
@@ -877,7 +878,7 @@ RUN \
   "pulumi" \
   "istio" \
   "caddy" \
-  "traefik" \ 
+  "traefik" \
   "cfssl" ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
     git clone "${url}" "/tmp/"$(basename "${url%.git}")"" \
