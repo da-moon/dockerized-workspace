@@ -17,13 +17,13 @@ RUN \
   pacman-key --init \
   && pacman-key --populate "archlinux" ;
 # Polar Repo
-RUN \
-  pacman-key --keyserver "hkps://keys.openpgp.org" --recv-key "D7E35661EB1A280A" \
-  && pacman-key --lsign-key "D7E35661EB1A280A" \
-  && ( \
-    echo '[polarrepo]' ; \
-    echo 'Server = https://polarrepo.polarian.dev' ; \
-  ) | tee -a "/etc/pacman.conf" > /dev/null ;
+# RUN \
+#   pacman-key --keyserver "hkps://keys.openpgp.org" --recv-key "D7E35661EB1A280A" \
+#   && pacman-key --lsign-key "D7E35661EB1A280A" \
+#   && ( \
+#     echo '[polarrepo]' ; \
+#     echo 'Server = https://polarrepo.polarian.dev' ; \
+#   ) | tee -a "/etc/pacman.conf" > /dev/null ;
 # Chaotic-AUR
 RUN \
   pacman-key --recv-key "FBA220DFC880C036" --keyserver "keyserver.ubuntu.com" \
@@ -400,8 +400,8 @@ RUN \
 #  ╰──────────────────────────────────────────────────────────╯
 USER "root"
 ENV COLORTERM="truecolor"
-ENV EDITOR="nvim"
-ENV VISUAL="nvim"
+ENV EDITOR="hx"
+ENV VISUAL="hx"
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
@@ -687,7 +687,7 @@ mkdir -p "${HOME}/.config/helix" \
     echo '  lockfile="/tmp/$(basename -s.sh "${self}").lock" ;' ; \
     echo '  (' ; \
     echo '    flock -x -n 20 || exit 55 ;' ; \
-    echo '    echo "+++ building grammar"' ; \
+    echo '    # echo "+++ building grammar"' ; \
     echo '    # hx --grammar fetch' ; \
     echo '    # hx --grammar build' ; \
     echo '  ) 20> "${lockfile}"' ; \
