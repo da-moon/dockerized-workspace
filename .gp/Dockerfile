@@ -484,7 +484,7 @@ RUN \
       echo 'eval "$(atuin init bash)" ;' ; \
   ) | tee "/etc/profile.d/atuin.sh" > /dev/null ; \
   xplr --version > /dev/null 2>&1 \
-  && echo 'mkdir -p "${HOME}/.config/xplr" && wget -qO "${HOME}/.config/xplr/init.lua" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/xplr/init.lua" ;' \
+  && echo 'mkdir -p "${HOME}/.config/xplr" && wget -qO "${HOME}/.config/xplr/init.lua" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/xplr/init.lua" ;' ;
   
 #  ────────────────────────────────────────────────────────────
 
