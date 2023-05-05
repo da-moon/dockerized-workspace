@@ -428,7 +428,15 @@ RUN \
   echo 'alias llfu="exa -bghHliS --git" ;' ; \
   echo 'alias llt="exa -T" ;' ; \
   echo 'alias ls="exa" ;' ; \
-  ) | tee "/etc/profile.d/exa.sh" > /dev/null || exit 1 ;
+  ) | tee "/etc/profile.d/exa.sh" > /dev/null || exit 1 ; \
+  ( \
+  # ensures shell always has the latest gipod variables
+  echo 'if hx --version > /dev/null 2>&1 ; then' ;\
+  echo '  export EDITOR="hx" ;' ;\
+  echo '  export EDITOR="visual" ;' ;\
+  echo 'fi' ;\
+  ) | tee "/etc/profile.d/editor.sh" > /dev/null || exit 1
+
 
 #  ────────────────────────────────────────────────────────────
 
