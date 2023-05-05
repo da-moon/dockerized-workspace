@@ -9,9 +9,21 @@ USER "root"
 ENV USER="gitpod"
 ENV UID="33333"
 ENV HOME="/home/${USER}"
+ARG WORKDIR="/workspace"
+ENV WORKDIR "${WORKDIR}"
+
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                      initial setup                       │
 #  ╰──────────────────────────────────────────────────────────╯
+# hadolint ignore=DL3059
+RUN \
+sed \
+  -e '/XDG_/d' \
+  -e '$aXDG_CACHE_HOME  DEFAULT=@{WORKDIR}/.cache' \
+  -e '$aXDG_CONFIG_HOME DEFAULT=@{WORKDIR}/.config' \
+  -e '$aXDG_DATA_HOME   DEFAULT=@{WORKDIR}/.local/share' \
+  -e '$aXDG_STATE_HOME  DEFAULT=@{WORKDIR}/.local/state' \
+  "/etc/security/pam_env.conf" ;
 # hadolint ignore=DL3059
 RUN \
   pacman-key --init \
@@ -982,8 +994,6 @@ RUN \
 #  │                   user profile config                    │
 #  ╰──────────────────────────────────────────────────────────╯
 USER "${USER}"
-ARG WORKDIR="/workspace"
-ENV WORKDIR "${WORKDIR}"
 WORKDIR "${WORKDIR}"
 RUN \
   ( \
