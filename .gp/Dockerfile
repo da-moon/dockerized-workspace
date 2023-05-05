@@ -402,10 +402,30 @@ USER "root"
 ENV COLORTERM="truecolor"
 ENV EDITOR="hx"
 ENV VISUAL="hx"
+ENV _ZO_DATA_DIR="/workspace/zoxide/"
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   pacman --quiet -Syy --noconfirm --needed \
+    "bottom" \
+    "cocogitto" \
+    "eva" \
+    "hck" \
+    "inlyne" \
+    "jql" \
+    "mdcat" \
+    "navi" \
+    "nu" \
+    "pipr" \
+    "qsv" \
+    "rnr" \
+    "topgrade" \
+    "xh" \
+    "zellij" \
+    "zoxide" \
+    "xplr" \
+    "xcp" \
+    "ripsecrets" \
     "neovim" \
     "sd" \
     "duf" \
@@ -419,6 +439,14 @@ RUN \
     "atuin" \
     "bat" \
     "bat-extras" ; \
+  zoxide --version && ( \
+  ( \
+    echo 'export _ZO_DATA_DIR="/workspace/zoxide" ; ' ; \
+    echo '[ ! -d "${_ZO_DATA_DIR}" ] && mkdir "${_ZO_DATA_DIR} ;" ;' \
+    echo 'eval "$(zoxide init bash)" ;' ; \
+    echo 'alias cd="z"' ; \
+  ) | tee "/etc/profile.d/zoxide.sh"
+  ) ; 
   bat --version > /dev/null 2>&1 && ( \
   echo 'alias cat="bat -pp" ;' ; \
   echo "export MANPAGER='sh -c \"col -bx | bat --language man --style plain\"' ;" ; \
@@ -437,10 +465,14 @@ RUN \
   echo '  export VISUAL="hx" ;' ;\
   echo 'fi' ;\
   ) | tee "/etc/profile.d/edito.sh" > /dev/null || exit 1 ; \
-  atuin --version > /dev/null 2>&1 \
-  && echo 'eval "$(atuin init bash)" ;' > "/etc/profile.d/starship.sh" || exit 1 ;
-
-
+  atuin --version > /dev/null 2>&1 && ( \
+      echo 'mkdir -p "${HOME}/.config/atuin" && wget -qO "${HOME}/.config/atuin/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/atuin/config.toml" ;'
+      echo 'echo "db_path = \"${WORKDIR}/.history.db\" >> \"${HOME}/.config/atuin/config.toml\"' ; \
+      echo 'eval "$(atuin init bash)" ;' ; \
+  ) | tee "/etc/profile.d/atuin.sh" > /dev/null ; \
+  xplr --version > /dev/null 2>&1 \
+  && echo 'mkdir -p "${HOME}/.config/xplr" && wget -qO "${HOME}/.config/xplr/init.lua" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/xplr/init.lua" ;' \
+  
 #  ────────────────────────────────────────────────────────────
 
 #  ╭──────────────────────────────────────────────────────────╮
@@ -480,6 +512,18 @@ RUN \
     echo 'export CARGO_HOME="${HOME}/.cargo";' ; \
     echo 'export PATH="${PATH}:${CARGO_HOME}/bin";' ; \
   ) | tee -a "/etc/profile.d/00-rust.sh" > /dev/null ; \
+  rustup toolchain install stable \
+  && cargo install --locked \
+    "cargo-binstall" \
+    "huber" \
+  && cargo binstall -y \
+    "cargo-cache" \
+    "cargo-update" \
+    "pipr" \
+  && cargo install --locked --git "https://hg.sr.ht/~cyplo/legdur" \
+  && cargo install --locked --git "https://github.com/flatt-security/shisho.git" \
+  && cargo-cache --remove-dir all \
+  && rustup toolchain list | cut -d' ' -f1 | xargs -r -I {} rustup toolchain uninstall {} ; \
   # For fixing the following error:
   #
   # ❯ sudo su -
@@ -490,20 +534,6 @@ RUN \
     [ ! -r "/usr/share/bash-completion/completions/rustup" ]  \
       && rustup completions bash rustup > "/usr/share/bash-completion/completions/rustup" || exit 0 ; \
   ) || exit 0
-# hadolint ignore=SC2016
-# installing rusttool chain , building/downloading 
-# some common binaries and removing it afterwards to keep
-# the image lean
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  rustup toolchain install stable \
-  && cargo install \
-    --locked "cargo-binstall" \
-  && cargo binstall -y \
-    "cargo-cache" \
-  && cargo-cache --remove-dir all \
-  && rustup toolchain list | cut -d' ' -f1 | xargs -r -I {} rustup toolchain uninstall {}
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 install go packages                      │
 #  ╰──────────────────────────────────────────────────────────╯
