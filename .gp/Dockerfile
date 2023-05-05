@@ -457,8 +457,8 @@ RUN \
     echo '[ ! -d "${_ZO_DATA_DIR}" ] && mkdir "${_ZO_DATA_DIR} ;" ;' \
     echo 'eval "$(zoxide init bash)" ;' ; \
     echo 'alias cd="z"' ; \
-  ) | tee "/etc/profile.d/zoxide.sh"
-  ) ; 
+  ) | tee "/etc/profile.d/zoxide.sh" \
+  ) ; \
   bat --version > /dev/null 2>&1 && ( \
   echo 'alias cat="bat -pp" ;' ; \
   echo "export MANPAGER='sh -c \"col -bx | bat --language man --style plain\"' ;" ; \
