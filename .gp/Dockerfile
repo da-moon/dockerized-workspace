@@ -15,7 +15,7 @@ ENV WORKDIR "${WORKDIR}"
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                      initial setup                       │
 #  ╰──────────────────────────────────────────────────────────╯
-# hadolint ignore=DL3059
+# hadolint ignore=SC2016
 RUN \
 sed \
   -e '/XDG_/d' \
@@ -415,6 +415,7 @@ ENV COLORTERM="truecolor"
 ENV EDITOR="hx"
 ENV VISUAL="hx"
 ENV _ZO_DATA_DIR="/workspace/zoxide/"
+# hadolint ignore=SC2016
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
@@ -478,7 +479,7 @@ RUN \
   echo 'fi' ;\
   ) | tee "/etc/profile.d/edito.sh" > /dev/null || exit 1 ; \
   atuin --version > /dev/null 2>&1 && ( \
-      echo 'mkdir -p "${HOME}/.config/atuin" && wget -qO "${HOME}/.config/atuin/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/atuin/config.toml" ;'
+      echo 'mkdir -p "${HOME}/.config/atuin" && wget -qO "${HOME}/.config/atuin/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/atuin/config.toml" ;' \
       echo 'echo "db_path = \"${WORKDIR}/.history.db\" >> \"${HOME}/.config/atuin/config.toml\"' ; \
       echo 'eval "$(atuin init bash)" ;' ; \
   ) | tee "/etc/profile.d/atuin.sh" > /dev/null ; \
