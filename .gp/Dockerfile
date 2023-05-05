@@ -416,6 +416,7 @@ RUN \
     "tokei" \
     "hyperfine" \
     "exa" \
+    "atuin" \
     "bat" \
     "bat-extras" ; \
   bat --version > /dev/null 2>&1 && ( \
@@ -433,9 +434,11 @@ RUN \
   # ensures shell always has the latest gipod variables
   echo 'if hx --version > /dev/null 2>&1 ; then' ;\
   echo '  export EDITOR="hx" ;' ;\
-  echo '  export EDITOR="visual" ;' ;\
+  echo '  export VISUAL="hx" ;' ;\
   echo 'fi' ;\
-  ) | tee "/etc/profile.d/editor.sh" > /dev/null || exit 1
+  ) | tee "/etc/profile.d/edito.sh" > /dev/null || exit 1 ; \
+  atuin --version > /dev/null 2>&1 \
+  && echo 'eval "$(atuin init bash)" ;' > "/etc/profile.d/starship.sh" || exit 1 ;
 
 
 #  ────────────────────────────────────────────────────────────
@@ -453,7 +456,6 @@ RUN \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   pacman --quiet -Syy --noconfirm --needed \
     "rustup" ; \
-
   # https://stackoverflow.com/questions/28227739/lock-a-file-in-bash-using-flock-and-lockfile
   rustup --version > /dev/null 2>&1 && ( \
     echo '(' ; \
@@ -487,7 +489,21 @@ RUN \
       && rustup completions bash cargo > "/usr/share/bash-completion/completions/cargo" || exit 0 ; \
     [ ! -r "/usr/share/bash-completion/completions/rustup" ]  \
       && rustup completions bash rustup > "/usr/share/bash-completion/completions/rustup" || exit 0 ; \
-  ) || exit 0 ;
+  ) || exit 0
+# hadolint ignore=SC2016
+# installing rusttool chain , building/downloading 
+# some common binaries and removing it afterwards to keep
+# the image lean
+RUN \
+  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
+  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
+  rustup toolchain install stable \
+  && cargo install \
+    --locked "cargo-binstall" \
+  && cargo binstall -y \
+    "cargo-cache" \
+  && cargo-cache --remove-dir all \
+  && rustup toolchain list | cut -d' ' -f1 | xargs -r -I {} rustup toolchain uninstall {}
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 install go packages                      │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -682,7 +698,6 @@ mkdir -p "${HOME}/.config/helix" \
 && mv "${dir}/runtime" "${HOME}/.config/helix/runtime" \
 && ln -sf "${HOME}/.local/bin/hx" "/usr/local/bin/hx" \
 && rm -r "${dir}" \
-&& wget -qO "${HOME}/.config/helix/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/helix/config.toml" \
 && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" \
   "${HOME}/.local/bin" \
   "${HOME}/.config/helix" \
@@ -695,7 +710,7 @@ mkdir -p "${HOME}/.config/helix" \
     echo '  lockfile="/tmp/$(basename -s.sh "${self}").lock" ;' ; \
     echo '  (' ; \
     echo '    flock -x -n 20 || exit 55 ;' ; \
-    echo '    # echo "+++ building grammar"' ; \
+    echo '    wget -qO "${HOME}/.config/helix/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/helix/config.toml"' ; \
     echo '    # hx --grammar fetch' ; \
     echo '    # hx --grammar build' ; \
     echo '  ) 20> "${lockfile}"' ; \
@@ -707,8 +722,8 @@ mkdir -p "${HOME}/.config/helix" \
     echo '  } 20<"${lockfile}"' ; \
     echo '  [ -r "${lockfile}" ] && rm "${lockfile}" ;' ; \
     echo 'fi' ; \
-  ) | tee "${HOME}/.init.d/helix-grammar.sh" > /dev/null \
-  && chmod +x "${HOME}/.init.d/helix-grammar.sh" \
+  ) | tee "${HOME}/.init.d/helix.sh" > /dev/null \
+  && chmod +x "${HOME}/.init.d/helix.sh" \
   && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/helix-grammar.sh" \
 ) || exit 1
 #  ╭──────────────────────────────────────────────────────────╮
