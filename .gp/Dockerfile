@@ -4,7 +4,7 @@
 # ────────────────────────────────────────────────────────────────────────────────
 # hadolint ignore=DL3007
 FROM archlinux:latest
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 USER "root"
 ENV USER="gitpod"
 ENV UID="33333"
@@ -189,7 +189,7 @@ RUN \
 #  │                       shells                             │
 #  ╰──────────────────────────────────────────────────────────╯
 USER "root"
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 # hadolint ignore=SC2016
 RUN \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
@@ -218,7 +218,7 @@ RUN \
 USER "${USER}"
 SHELL ["/usr/bin/pwsh", "-NoLogo", "-Command"]
 RUN $parent=Split-Path -parent $PROFILE ; if (-not(Test-Path -Path $parent -PathType Container)) {$null = New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop}
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                    virtualization                        │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -420,25 +420,19 @@ RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   pacman --quiet -Syy --noconfirm --needed \
+    "chaotic-aur/topgrade" \
     "bottom" \
     "cocogitto" \
     "eva" \
     "hck" \
-    "inlyne" \
-    "jql" \
     "mdcat" \
     "navi" \
-    "nu" \
-    "pipr" \
-    "qsv" \
     "rnr" \
-    "topgrade" \
     "xh" \
     "zellij" \
     "zoxide" \
     "xplr" \
     "xcp" \
-    "ripsecrets" \
     "neovim" \
     "sd" \
     "duf" \
@@ -453,41 +447,44 @@ RUN \
     "bat" \
     "bat-extras" ; \
   zoxide --version && ( \
-  ( \
-    echo 'export _ZO_DATA_DIR="/workspace/zoxide" ; ' ; \
-    echo '[ ! -d "${_ZO_DATA_DIR}" ] && mkdir "${_ZO_DATA_DIR} ;" ;' \
-    echo 'eval "$(zoxide init bash)" ;' ; \
-    echo 'alias cd="z"' ; \
-  ) | tee "/etc/profile.d/zoxide.sh" \
-  ) ; \
+    ( \
+      echo 'export _ZO_DATA_DIR="/workspace/zoxide" ; ' ; \
+      echo '[ ! -d "${_ZO_DATA_DIR}" ] && mkdir "${_ZO_DATA_DIR} ;" ;' \
+      echo 'eval "$(zoxide init bash)" ;' ; \
+      echo 'alias cd="z"' ; \
+    ) | tee "/etc/profile.d/zoxide.sh" > /dev/null || exit 1 ; \
+  ) || exit 1 ; \
   bat --version > /dev/null 2>&1 && ( \
-  echo 'alias cat="bat -pp" ;' ; \
-  echo "export MANPAGER='sh -c \"col -bx | bat --language man --style plain\"' ;" ; \
+    echo 'alias cat="bat -pp" ;' ; \
+    echo "export MANPAGER='sh -c \"col -bx | bat --language man --style plain\"' ;" ; \
   ) | tee "/etc/profile.d/bat.sh" > /dev/null || exit 1  ; \
   exa --version > /dev/null 2>&1 && ( \
-  echo 'alias la="exa -alhF" ;' ; \
-  echo 'alias ll="exa -lhF" ;' ; \
-  echo 'alias llfu="exa -bghHliS --git" ;' ; \
-  echo 'alias llt="exa -T" ;' ; \
-  echo 'alias ls="exa" ;' ; \
+    echo 'alias la="exa -alhF" ;' ; \
+    echo 'alias ll="exa -lhF" ;' ; \
+    echo 'alias llfu="exa -bghHliS --git" ;' ; \
+    echo 'alias llt="exa -T" ;' ; \
+    echo 'alias ls="exa" ;' ; \
   ) | tee "/etc/profile.d/exa.sh" > /dev/null || exit 1 ; \
   ( \
-  # ensures shell always has the latest gipod variables
-  echo 'if hx --version > /dev/null 2>&1 ; then' ;\
-  echo '  export EDITOR="hx" ;' ;\
-  echo '  export VISUAL="hx" ;' ;\
-  echo 'fi' ;\
-  ) | tee "/etc/profile.d/edito.sh" > /dev/null || exit 1 ; \
+    echo 'if hx --version > /dev/null 2>&1 ; then' ;\
+    echo '  export EDITOR="hx" ;' ;\
+    echo '  export VISUAL="hx" ;' ;\
+    echo '  [ ! -d "${HOME}/.config/helix" ] && mkdir "${HOME}/.config/helix ;" ;' \
+    echo '  wget -qO "${HOME}/.config/helix/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/helix/config.toml" ;' ; \
+    echo 'fi' ;\
+  ) | tee "/etc/profile.d/editor.sh" > /dev/null || exit 1 ; \
   atuin --version > /dev/null 2>&1 && ( \
-      echo 'mkdir -p "${HOME}/.config/atuin" && wget -qO "${HOME}/.config/atuin/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/atuin/config.toml" ;' \
-      echo 'echo "db_path = \"${WORKDIR}/.history.db\" >> \"${HOME}/.config/atuin/config.toml\"' ; \
-      echo 'eval "$(atuin init bash)" ;' ; \
-  ) | tee "/etc/profile.d/atuin.sh" > /dev/null ; \
-  xplr --version > /dev/null 2>&1 \
-  && echo 'mkdir -p "${HOME}/.config/xplr" && wget -qO "${HOME}/.config/xplr/init.lua" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/xplr/init.lua" ;' ;
-  
+    echo '[ ! -d "${HOME}/.config/atuin" ] && mkdir "${HOME}/.config/atuin ;" ;' \
+    echo 'wget -qO "${HOME}/.config/atuin/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/atuin/config.toml" ;' ; \
+    echo 'sed -i "/db_path/d" "${HOME}/.config/atuin/config.toml"' ; \
+    echo "echo 'db_path = \"${WORKDIR}/.history.db\"' >> '${HOME}/.config/atuin/config.toml' ;" ; \
+    echo 'eval "$(atuin init bash)" ;' ; \
+  ) | tee "/etc/profile.d/atuin.sh" > /dev/null || exit 1 ; \
+  xplr --version > /dev/null 2>&1 && ( \
+    echo '[ ! -d "${HOME}/.config/xplr" ] && mkdir "${HOME}/.config/xplr ;" ;' \
+    echo 'wget -qO "${HOME}/.config/xplr/init.lua" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/xplr/init.lua" ;' ; \
+  ) | tee "/etc/profile.d/xplr.sh" > /dev/null  || exit 1 ;
 #  ────────────────────────────────────────────────────────────
-
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 rust setup                               │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -529,12 +526,13 @@ RUN \
   && cargo install --locked \
     "cargo-binstall" \
     "huber" \
+  && cargo install --locked --git "https://hg.sr.ht/~cyplo/legdur" \
+  && cargo install --locked --git "https://github.com/flatt-security/shisho.git" \
+  && cargo install --locked --features all_features "qsv" \
   && cargo binstall -y \
     "cargo-cache" \
     "cargo-update" \
     "pipr" \
-  && cargo install --locked --git "https://hg.sr.ht/~cyplo/legdur" \
-  && cargo install --locked --git "https://github.com/flatt-security/shisho.git" \
   && cargo-cache --remove-dir all \
   && rustup toolchain list | cut -d' ' -f1 | xargs -r -I {} rustup toolchain uninstall {} ; \
   # For fixing the following error:
@@ -930,6 +928,10 @@ RUN \
   "https://aur.archlinux.org/envoyproxy-bin.git" \
   "https://aur.archlinux.org/gojira.git" \
   "https://aur.archlinux.org/litmusctl.git" \
+  "https://aur.archlinux.org/inlyne-bin.git" \
+  "https://aur.archlinux.org/jql.git" \
+  "https://aur.archlinux.org/ripsecrets.git" \
+  "https://aur.archlinux.org/rnr-bin.git" \
   ) ; \
   GROUPS_ARR=( \
     "caddy" \
@@ -990,7 +992,7 @@ RUN \
 # SHELL ["/usr/bin/pwsh", "-NoLogo", "-Command"]
 # # hadolint ignore=DL4006
 # RUN 'driftctl completion powershell | Out-String | Invoke-Expression' | Out-File -Append -Encoding ascii "$PROFILE"
-# SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+# SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                   user profile config                    │
 #  ╰──────────────────────────────────────────────────────────╯
