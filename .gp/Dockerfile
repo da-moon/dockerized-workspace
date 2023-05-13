@@ -178,7 +178,7 @@ RUN \
   "https://aur.archlinux.org/su-exec.git" \
   ) ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone --quite "${url}" "/tmp/"$(basename "${url%.git}")"" \
+    git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
     && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
     for i in {1..5}; do makepkg -sicr --noconfirm --noprogressbar && break || sleep 15; done \
     && popd > /dev/null 2>&1 || exit 1 ; \
@@ -200,7 +200,7 @@ RUN \
   ) ; \
   pacman --quiet --noprogressbar -Syy --noconfirm --needed "shfmt" "nushell" "starship" ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone --quite "${url}" "/tmp/"$(basename "${url%.git}")"" \
+    git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
     && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
     && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
     for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noconfirm --noprogressbar > /dev/null 2>&1 && break || sleep 15; done \
@@ -298,7 +298,7 @@ RUN \
   pacman --quiet -Syy --noconfirm --needed \
     "fzf" > /dev/null 2>&1 ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone --quite "${url}" "/tmp/"$(basename "${url%.git}")"" \
+    git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
     && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
     && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
     for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noconfirm  > /dev/null 2>&1&& break || sleep 15; done \
@@ -332,7 +332,7 @@ RUN \
   ) ; \ 
   pacman --quiet -Syy --noconfirm --needed "just" "make" ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone --quite "${url}" "/tmp/"$(basename "${url%.git}")"" \
+    git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
     && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
     && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
     for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noconfirm --noprogressbar && break || sleep 15; done \
@@ -364,7 +364,7 @@ RUN \
   # TODO: check for difftastic
   pacman --quiet --noprogressbar -Syy --noconfirm --needed "github-cli" "git-delta" ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone --quite "${url}" "/tmp/"$(basename "${url%.git}")"" \
+    git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
     && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
     && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
     for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noconfirm --noprogressbar && break || sleep 15; done \
@@ -643,7 +643,7 @@ RUN \
   "remark-preset-lint-recommended" \
   "remark-lint-list-item-indent" \
   "remark-reference-links" \
-  && npm cache clean --quite --force ;
+  && npm cache clean --quiet --force ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                      text editors                        │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -673,7 +673,7 @@ RUN \
   | xargs -r -I {} wget -qO "/usr/local/bin/marksman" {} \
   && chmod +x "/usr/local/bin/marksman" \
   && marksman --version > /dev/null 2>&1 \
-  && npm cache clean --quite --force \
+  && npm cache clean --quiet --force \
   && go clean -modcache > /dev/null 2>&1 \
   && chown "$(id -u "${USER}"):$(id -g "${USER}")" -R "$(go env GOPATH)" "${HOME}" ;
 #
@@ -786,7 +786,7 @@ RUN \
   ) ; \
   pacman --quiet --noprogressbar -Syy --noconfirm --needed "packer" "consul" "consul-template" "vault" ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone --quite "${url}" "/tmp/"$(basename "${url%.git}")"" \
+    git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
     && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
     && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
     for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noprogressbar --nocheck --skipinteg --noconfirm && break || sleep 15; done \
@@ -914,7 +914,7 @@ RUN \
   "traefik" \
   "cfssl" ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone --quite "${url}" "/tmp/"$(basename "${url%.git}")"" \
+    git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
     && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
     && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
     for i in {1..5}; do su-exec "${USER}" makepkg -sicr --nocheck --skipinteg --noconfirm --noprogressbar && break || sleep 15; done \
@@ -1009,7 +1009,7 @@ RUN \
   ln -sf "/usr/share/zoneinfo/America/New_York" "/etc/localtime" ; \
   chown "$(id -u "${USER}"):$(id -g "${USER}")" -R  "${WORKDIR}" "${HOME}" ; \
   [ "$(pacman -Qdtq)" != "" ] && pacman -Rs $(pacman -Qdtq) ; \
-  npm cache clean --quite --force ; \
+  npm cache clean --quiet --force ; \
   go clean -modcache ; \
   su-exec "${USER}" go clean -modcache ; \
   go clean -cache ; \
