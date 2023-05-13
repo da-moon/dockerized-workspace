@@ -541,7 +541,7 @@ ENV CGO_LDFLAGS="-s -w -extldflags '-static'"
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet --noprogressbar -Syy --noconfirm --needed "go" "goreleaser" "mage" \
+  pacman -Syy --noconfirm --needed "go" "goreleaser" "mage" > /dev/null 2>&1 \
   && go version > /dev/null 2>&1 \
   &&  ( \
   echo 'export PATH="${PATH}:$(go env GOPATH)/bin";' ; \
@@ -574,7 +574,7 @@ ENV PATH="${PATH}:${HOME}/.luarocks/bin"
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet --noprogressbar -Syy --noconfirm --needed "lua" "luajit" "luarocks" ;
+  pacman -Syy --noconfirm --needed "lua" "luajit" "luarocks" > /dev/null 2>&1 ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 install ruby packages                    │
 #  ╰──────────────────────────────────────────────────────────╯
