@@ -26,21 +26,22 @@ sed \
   "/etc/security/pam_env.conf" ;
 # hadolint ignore=DL3059
 RUN \
-  pacman-key --init \
-  && pacman-key --populate "archlinux" ;
+  pacman-key --init > /dev/null 2>&1 \
+  && pacman-key --populate "archlinux" > /dev/null 2>&1 ;
 # Polar Repo
-# RUN \
-#   pacman-key --keyserver "hkps://keys.openpgp.org" --recv-key "D7E35661EB1A280A" \
-#   && pacman-key --lsign-key "D7E35661EB1A280A" \
-#   && ( \
-#     echo '[polarrepo]' ; \
-#     echo 'Server = https://polarrepo.polarian.dev' ; \
-#   ) | tee -a "/etc/pacman.conf" > /dev/null ;
+# curl -fsSlLo - "https://git.polarian.dev/AUR/polarrepo/raw/branch/master/pkg/keys/polarian.asc" | pacman-key --add -
+RUN \
+  pacman-key --keyserver "hkps://keys.openpgp.org" --recv-key "0770E5312238C760" \
+  && pacman-key --lsign-key "0770E5312238C760" > /dev/null 2>&1  \
+  && ( \
+    echo '[polarrepo]' ; \
+    echo 'Server = https://polarrepo.polarian.dev' ; \
+  ) | tee -a "/etc/pacman.conf" > /dev/null ;
 # Chaotic-AUR
 RUN \
-  pacman-key --recv-key "FBA220DFC880C036" --keyserver "keyserver.ubuntu.com" \
-  && pacman-key --lsign-key "FBA220DFC880C036" \
-  && pacman -U --noconfirm \
+  pacman-key --recv-key "FBA220DFC880C036" --keyserver "keyserver.ubuntu.com" > /dev/null 2>&1 \
+  && pacman-key --lsign-key "FBA220DFC880C036" > /dev/null 2>&1 \
+  && pacman -U --noprogressbar --noconfirm \
     'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' \
     'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' \
   && ( \
@@ -74,7 +75,7 @@ RUN \
     # gets executed whe the first shell is opened. This approach is to make the
     # docker images as small as possible since upgrading all packages creates large
     # diffs and large image sizes
-    echo '[ ! -r "/.pacman-update" ] && ( sudo pacman --quiet -Syyu --noconfirm && sudo touch "/.pacman-update" )' ; \
+    echo '[ ! -r "/.pacman-update" ] && ( sudo pacman --quiet --noprogressbar -Syyu --noconfirm && touch "/.pacman-update" )' ; \
     echo 'alias pacman="sudo pacman"' ; \
   ) | tee "/etc/profile.d/pacman.sh" > /dev/null ;
 #  ╭──────────────────────────────────────────────────────────╮
@@ -83,13 +84,13 @@ RUN \
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet -Syy --noconfirm --needed "reflector" \
+  pacman --quiet --noprogressbar -Syy --noconfirm --needed "reflector" \
   && reflector \
   --verbose \
   -p https \
   --latest 5 \
   --sort rate \
-  --save "/etc/pacman.d/mirrorlist"
+  --save "/etc/pacman.d/mirrorlist" > /dev/null 2>&1
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                   user and group setup                   │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -97,7 +98,7 @@ RUN \
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet -Syy --noconfirm --needed "sudo" "openssl" \
+  pacman --quiet --noprogressbar -Syy --noconfirm --needed "sudo" "openssl" \
   && ! getent group "${USER}" > /dev/null \
   && groupadd --gid "${UID}" "${USER}" > /dev/null > /dev/null \
   && useradd \
@@ -133,10 +134,7 @@ RUN \
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet -Syy --noconfirm --needed \
-  "base-devel" \
-  "upx" \
-  "git" \
+  pacman --quiet --noprogressbar -Syy --noconfirm --needed "base-devel" "upx" "git" \
   # ─── BASE GIT CONFIGS ───────────────────────────────────────────────────────────
   && git --version > /dev/null 2>&1 && ( \
   git config --system push.recurseSubmodules "on-demand" \
@@ -149,7 +147,7 @@ RUN \
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet -Syy --noconfirm --needed \
+  pacman --quiet --noprogressbar -Syy --noconfirm --needed \
   "openssh" \
   "rsync" \
   "man-db" \
@@ -180,9 +178,9 @@ RUN \
   "https://aur.archlinux.org/su-exec.git" \
   ) ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone "${url}" "/tmp/"$(basename "${url%.git}")"" \
+    git clone --quite "${url}" "/tmp/"$(basename "${url%.git}")"" \
     && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
-    for i in {1..5}; do makepkg -sicr --noconfirm && break || sleep 15; done \
+    for i in {1..5}; do makepkg -sicr --noconfirm --noprogressbar && break || sleep 15; done \
     && popd > /dev/null 2>&1 || exit 1 ; \
   done ;
 #  ╭──────────────────────────────────────────────────────────╮
@@ -200,15 +198,12 @@ RUN \
     "https://aur.archlinux.org/shellcheck-bin.git" \
     "https://aur.archlinux.org/powershell-bin.git" \
   ) ; \
-  pacman --quiet -Syy --noconfirm --needed \
-    "shfmt" \
-    "nushell" \
-    "starship" ; \
+  pacman --quiet --noprogressbar -Syy --noconfirm --needed "shfmt" "nushell" "starship" ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone "${url}" "/tmp/"$(basename "${url%.git}")"" \
+    git clone --quite "${url}" "/tmp/"$(basename "${url%.git}")"" \
     && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
     && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
-    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noconfirm && break || sleep 15; done \
+    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noconfirm --noprogressbar > /dev/null 2>&1 && break || sleep 15; done \
     && popd > /dev/null 2>&1 || exit 1 ; \
     rm -r "/tmp/"$(basename "${url%.git}")"" ; \
   done ; \
@@ -233,7 +228,7 @@ RUN \
   "docker-buildx" \
   "docker-machine" \
   "docker-scan" \
-  "docker-compose" ; \
+  "docker-compose" > /dev/null 2>&1 ; \
   ( \
     echo '#!/bin/sh' ; \
     echo 'sudoIf() { if [ "$(id -u)" -ne 0 ]; then sudo "$@"; else "$@"; fi }' ; \
@@ -273,7 +268,7 @@ RUN \
   pacman --quiet -Syy --noconfirm --needed \
   "noto-fonts" \
   "ttf-ubuntu-font-family" \
-  "ttf-font-awesome" ;
+  "ttf-font-awesome" > /dev/null 2>&1 ;
 
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                          gitpod                          │
@@ -301,12 +296,12 @@ RUN \
   "https://aur.archlinux.org/fzf-extras.git" \
   ) ; \
   pacman --quiet -Syy --noconfirm --needed \
-    "fzf" ; \
+    "fzf" > /dev/null 2>&1 ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone "${url}" "/tmp/"$(basename "${url%.git}")"" \
+    git clone --quite "${url}" "/tmp/"$(basename "${url%.git}")"" \
     && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
     && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
-    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noconfirm && break || sleep 15; done \
+    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noconfirm  > /dev/null 2>&1&& break || sleep 15; done \
     && popd > /dev/null 2>&1 || exit 1 ; \
     rm -r "/tmp/"$(basename "${url%.git}")"" ; \
   done ; \
@@ -334,15 +329,13 @@ RUN \
   AUR_CLONE_URLS=( \
   "https://aur.archlinux.org/go-task.git" \
   "https://aur.archlinux.org/earthly-bin.git" \
-  ) ; \
-  pacman --quiet -Syy --noconfirm --needed \
-    "just" \
-    "make" ; \
+  ) ; \ 
+  pacman --quiet -Syy --noconfirm --needed "just" "make" ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone "${url}" "/tmp/"$(basename "${url%.git}")"" \
+    git clone --quite "${url}" "/tmp/"$(basename "${url%.git}")"" \
     && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
     && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
-    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noconfirm && break || sleep 15; done \
+    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noconfirm --noprogressbar && break || sleep 15; done \
     && popd > /dev/null 2>&1 || exit 1 ; \
     rm -r "/tmp/"$(basename "${url%.git}")"" ; \
   done ; \
@@ -368,14 +361,13 @@ RUN \
   "https://aur.archlinux.org/git-completion.git" \
   "https://aur.archlinux.org/git-shelf.git" \
   ) ; \
-  pacman --quiet -Syy --noconfirm --needed \
-    "github-cli" \
-    "git-delta" ; \
+  # TODO: check for difftastic
+  pacman --quiet --noprogressbar -Syy --noconfirm --needed "github-cli" "git-delta" ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone "${url}" "/tmp/"$(basename "${url%.git}")"" \
+    git clone --quite "${url}" "/tmp/"$(basename "${url%.git}")"" \
     && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
     && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
-    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noconfirm && break || sleep 15; done \
+    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noconfirm --noprogressbar && break || sleep 15; done \
     && popd > /dev/null 2>&1 || exit 1 ; \
     rm -r "/tmp/"$(basename "${url%.git}")"" ; \
   done ; \
@@ -419,7 +411,7 @@ ENV _ZO_DATA_DIR="/workspace/zoxide/"
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet -Syy --noconfirm --needed \
+  pacman --quiet --noprogressbar -Syy --noconfirm --needed \
     "chaotic-aur/topgrade" \
     "bottom" \
     "cocogitto" \
@@ -427,7 +419,6 @@ RUN \
     "hck" \
     "mdcat" \
     "navi" \
-    "rnr" \
     "xh" \
     "zellij" \
     "zoxide" \
@@ -445,7 +436,7 @@ RUN \
     "exa" \
     "atuin" \
     "bat" \
-    "bat-extras" ; \
+    "bat-extras"  ; \
   zoxide --version && ( \
     ( \
       echo 'export _ZO_DATA_DIR="/workspace/zoxide" ; ' ; \
@@ -496,8 +487,7 @@ ENV PATH="${PATH}:${CARGO_HOME}/bin"
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet -Syy --noconfirm --needed \
-    "rustup" ; \
+  pacman --quiet --noprogressbar -Syy --noconfirm --needed "rustup" ; \
   # https://stackoverflow.com/questions/28227739/lock-a-file-in-bash-using-flock-and-lockfile
   rustup --version > /dev/null 2>&1 && ( \
     echo '(' ; \
@@ -521,20 +511,15 @@ RUN \
     echo 'export RUSTUP_HOME="${HOME}/.rustup";' ; \
     echo 'export CARGO_HOME="${HOME}/.cargo";' ; \
     echo 'export PATH="${PATH}:${CARGO_HOME}/bin";' ; \
-  ) | tee -a "/etc/profile.d/00-rust.sh" > /dev/null ; \
-  rustup toolchain install stable \
-  && cargo install --locked \
-    "cargo-binstall" \
-    "huber" \
-  && cargo install --locked --git "https://hg.sr.ht/~cyplo/legdur" \
-  && cargo install --locked --git "https://github.com/flatt-security/shisho.git" \
-  && cargo install --locked --features all_features "qsv" \
-  && cargo binstall -y \
-    "cargo-cache" \
-    "cargo-update" \
-    "pipr" \
-  && cargo-cache --remove-dir all \
-  && rustup toolchain list | cut -d' ' -f1 | xargs -r -I {} rustup toolchain uninstall {} ; \
+  ) | tee -a "/etc/profile.d/00-rust.sh" > /dev/null \
+  && rustup --quiet toolchain install "stable" \
+  && cargo install --quiet --locked "cargo-binstall" \
+  && cargo install --quiet --locked --git "https://hg.sr.ht/~cyplo/legdur" \
+  && cargo install --quiet --locked --git "https://github.com/flatt-security/shisho.git" \
+  && cargo install --quiet --locked --features all_features "qsv" \
+  && cargo binstall --quiet --no-confirm "cargo-cache" "cargo-update" "pipr" > /dev/null 2>&1 \
+  && cargo-cache --remove-dir "all" > /dev/null 2>&1 \
+  && rustup toolchain list | cut -d' ' -f1 | xargs -r -I {} rustup --quiet toolchain uninstall {} ; \
   # For fixing the following error:
   #
   # ❯ sudo su -
@@ -556,8 +541,7 @@ ENV CGO_LDFLAGS="-s -w -extldflags '-static'"
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet -Syy --noconfirm --needed \
-  "go" "goreleaser" "mage" \
+  pacman --quiet --noprogressbar -Syy --noconfirm --needed "go" "goreleaser" "mage" \
   && go version > /dev/null 2>&1 \
   &&  ( \
   echo 'export PATH="${PATH}:$(go env GOPATH)/bin";' ; \
@@ -590,10 +574,7 @@ ENV PATH="${PATH}:${HOME}/.luarocks/bin"
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet -Syy --noconfirm --needed \
-  "lua" \
-  "luajit" \
-  "luarocks" ;
+  pacman --quiet --noprogressbar -Syy --noconfirm --needed "lua" "luajit" "luarocks" ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 install ruby packages                    │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -603,15 +584,12 @@ ENV GEM_PATH="${HOME}/.gem"
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet -Syy --noconfirm --needed \
-  "ruby" \
+  pacman --quiet --noprogressbar -Syy --noconfirm --needed "ruby" \
   && gem --version > /dev/null 2>&1 \
-  && gem install --no-user-install \
-  "bundler" \
-  "serverspec" \
+  && gem install --quiet --no-user-install "bundler" "serverspec" \
   &&  ( \
-  echo 'export GEM_HOME="$(ruby -e "puts Gem.user_dir")";' ; \
-  echo 'export PATH="${PATH}:${GEM_HOME}/bin";' ; \
+    echo 'export GEM_HOME="$(ruby -e "puts Gem.user_dir")";' ; \
+    echo 'export PATH="${PATH}:${GEM_HOME}/bin";' ; \
   ) | tee "/etc/profile.d/ruby.sh" > /dev/null || exit 1 ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                     python packages                      │
@@ -622,11 +600,8 @@ ENV PATH="${PATH}:${HOME}/.local/bin"
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet -Syy --noconfirm --needed \
-  "python" \
-  "python-pip" \
-  "python-setuptools" \
-  "python-pre-commit" \
+  pacman --quiet --noprogressbar -Syy --noconfirm --needed "python" "python-pip" "python-setuptools" "python-pre-commit" \
+  && sudo -i -u "${USER}" python3 -m pip install  --quiet --no-cache-dir --upgrade "certifi" \
   && sudo -i -u "${USER}" \
     bash -c 'curl -sSL https://install.python-poetry.org | python3 -' > /dev/null 2>&1 \
   && ln -sf "${HOME}/.local/bin/poetry" "/usr/local/bin/poetry" \
@@ -642,13 +617,13 @@ USER "root"
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet -Syy --noconfirm --needed \
-  "nodejs" \
-  "npm" \
-  "yarn" \
+  pacman --quiet --noprogressbar -Syy --noconfirm --needed "nodejs" \
+  && nodejs  --version >/dev/null 2>&1 \
+  && pacman --quiet --noprogressbar -Syy --noconfirm --needed "npm" \
   && npm  --version >/dev/null 2>&1 \
-  && yarn --version >/dev/null 2>&1 \
   && echo 'export PATH="$(npm -g bin):${PATH}" ;' > "/etc/profile.d/npm.sh" || exit 1 \
+  && pacman --quiet --noprogressbar -Syy --noconfirm --needed "yarn" \
+  && yarn --version >/dev/null 2>&1 \
   && echo 'export PATH="$(yarn global bin):${PATH}" ;' > "/etc/profile.d/yarn.sh" || exit 1 ;
 # hadolint ignore=DL3016
 RUN \
@@ -682,7 +657,7 @@ RUN \
   npm install -g --silent dockerfile-language-server-nodejs && docker-langserver --node-ipc > /dev/null 2>&1 && \
   npm install -g --silent yaml-language-server && yaml-language-server --node-ipc > /dev/null 2>&1 && \
   npm install -g --silent vscode-json-languageserver ; \
-  python3 -m pip install -q --no-cache-dir "python-lsp-server[all]" ; \
+  python3 -m pip install --quiet --no-cache-dir --upgrade "python-lsp-server[all]" ; \
   go version > /dev/null 2>&1 && { \
     go install golang.org/x/tools/gopls@latest && gopls version > /dev/null 2>&1 ; \
     go install github.com/hashicorp/terraform-ls@latest && terraform-ls version > /dev/null 2>&1 ; \
@@ -697,9 +672,9 @@ RUN \
   )).browser_download_url" \
   | xargs -r -I {} wget -qO "/usr/local/bin/marksman" {} \
   && chmod +x "/usr/local/bin/marksman" \
-  && marksman --version \
+  && marksman --version > /dev/null 2>&1 \
   && npm cache clean --quite --force \
-  && go clean -modcache \
+  && go clean -modcache > /dev/null 2>&1 \
   && chown "$(id -u "${USER}"):$(id -g "${USER}")" -R "$(go env GOPATH)" "${HOME}" ;
 #
 # The following logins and runs the command. The login cause rust toolchain to get
@@ -777,11 +752,7 @@ ADD --chmod=0755 "https://raw.githubusercontent.com/ahmetb/kubectl-aliases/maste
 RUN \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  pacman --quiet -Syy --noconfirm --needed \
-  "helm" \
-  "kustomize" \
-  "kube-linter" \
-  "kubectl" ; \
+  pacman --quiet -Syy --noconfirm --needed "helm" "kustomize" "kube-linter" "kubectl" ; \
   kubectl version --client=true > /dev/null 2>&1 && ( \
     echo 'eval "$(kubectl completion bash)" ;' ; \
   ) | tee -a "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ; \
@@ -813,22 +784,18 @@ RUN \
     "consul" \
     "vault" \
   ) ; \
-  pacman --quiet -Syy --noconfirm --needed \
-  "packer" \
-  "consul" \
-  "consul-template" \
-  "vault" ; \
+  pacman --quiet --noprogressbar -Syy --noconfirm --needed "packer" "consul" "consul-template" "vault" ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone "${url}" "/tmp/"$(basename "${url%.git}")"" \
+    git clone --quite "${url}" "/tmp/"$(basename "${url%.git}")"" \
     && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
     && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
-    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --nocheck --skipinteg --noconfirm && break || sleep 15; done \
+    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noprogressbar --nocheck --skipinteg --noconfirm && break || sleep 15; done \
     && popd > /dev/null 2>&1 || exit 1 ; \
     rm -r "/tmp/"$(basename "${url%.git}")"" ; \
-    go clean -modcache ; \
-    su-exec "${USER}" go clean -modcache ; \
-    go clean -cache ; \
-    su-exec "${USER}" go clean -cache ; \
+    go clean -modcache > /dev/null 2>&1 ; \
+    su-exec "${USER}" go clean -modcache > /dev/null 2>&1 ; \
+    go clean -cache > /dev/null 2>&1 ; \
+    su-exec "${USER}" go clean -cache > /dev/null 2>&1 ; \
   done ; \
   for group in "${GROUPS_ARR[@]}";do \
     getent group "${group}" > /dev/null 2>&1 && usermod -aG "${group}" "${USER}" || continue ; \
@@ -937,10 +904,8 @@ RUN \
     "caddy" \
     "traefik" \
   ) ; \
-  pacman --quiet -Syy --noconfirm --needed \
-    "polarrepo/google-cloud-cli" \
-    "chaotic-aur/azure-cli" ; \
-  pacman --quiet -Syy --noconfirm --needed \
+  pacman --quiet --noprogressbar -Syy --noconfirm --needed "polarrepo/google-cloud-cli" "chaotic-aur/azure-cli" ; \
+  pacman --quiet --noprogressbar -Syy --noconfirm --needed \
   "aws-cli-v2" \
   "vector" \
   "pulumi" \
@@ -949,10 +914,10 @@ RUN \
   "traefik" \
   "cfssl" ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone "${url}" "/tmp/"$(basename "${url%.git}")"" \
+    git clone --quite "${url}" "/tmp/"$(basename "${url%.git}")"" \
     && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
     && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
-    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --nocheck --skipinteg --noconfirm && break || sleep 15; done \
+    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --nocheck --skipinteg --noconfirm --noprogressbar && break || sleep 15; done \
     && popd > /dev/null 2>&1 || exit 1 ; \
     rm -r "/tmp/"$(basename "${url%.git}")"" ; \
     go clean -modcache ; \
