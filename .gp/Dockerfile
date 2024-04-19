@@ -581,10 +581,10 @@ RUN \
     echo 'export CARGO_HOME="${HOME}/.cargo";' ; \
     echo 'export PATH="${PATH}:${CARGO_HOME}/bin";' ; \
   ) | tee -a "/etc/profile.d/00-rust.sh" > /dev/null \
-  && rustup --quiet toolchain install "stable" \
-  && cargo install --quiet --locked "cargo-binstall" \
-  && cargo install --quiet --locked --git "https://hg.sr.ht/~cyplo/legdur" \
-  && cargo install --quiet --locked --git "https://github.com/flatt-security/shisho.git" \
+  && rustup toolchain install "stable" \
+  && cargo install --locked "cargo-binstall" \
+  && cargo install --locked --git "https://hg.sr.ht/~cyplo/legdur" \
+  && cargo install --locked --git "https://github.com/flatt-security/shisho.git" \
   && cargo binstall --quiet --no-confirm \
     "cargo-cache" \
     "cargo-make" \
