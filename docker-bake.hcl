@@ -29,6 +29,10 @@ group "default" {
 target "default" {
   context    = "."
   dockerfile = ".gp/Dockerfile"
+  # https://wiki.archlinux.org/title/docker
+  ulimits = [
+    "nofile=1024:524288"
+  ]
   tags = [
     equal(LOCAL, true)
     ? "gp-archlinux-workspace"
