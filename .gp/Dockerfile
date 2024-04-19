@@ -535,6 +535,7 @@ RUN \
     echo 'wget -qO "${HOME}/.config/atuin/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/atuin/config.toml" ;' ; \
     echo 'sed -i "/db_path/d" "${HOME}/.config/atuin/config.toml"' ; \
     echo "echo 'db_path = \"${WORKDIR}/.history.db\"' >> '${HOME}/.config/atuin/config.toml' ;" ; \
+    echo '[[ -r "/usr/share/bash-preexec/bash-preexec.sh" ]] && source "/usr/share/bash-preexec/bash-preexec.sh"' ; \
     echo 'eval "$(atuin init bash)" ;' ; \
   ) | tee "/etc/profile.d/atuin.sh" > /dev/null || exit 1 ; \
   xplr --version > /dev/null 2>&1 && ( \
@@ -613,6 +614,7 @@ RUN \
   while read BIN ; do \
     upx "$(which "${BIN}")" ; \
   done ; < <(cat "${CARGO_HOME}/.crates2.json"  | jq -r ".installs | to_entries[].value.bins[]" | sort -u)
+RUN du --human-readable --max-depth 1 "${HOME}" > /.rustup
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 install go packages                      │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -961,10 +963,8 @@ RUN \
     "caddy" \
     "traefik" \
   ) ; \
-  pacman --quiet --noprogressbar -Syy --noconfirm --needed "chaotic-aur/google-cloud-cli" ; \
   pacman --quiet --noprogressbar -Syy --noconfirm --needed \
   "aws-cli-v2" \
-  "azure-cli" \
   "vector" \
   "pulumi" \
   "istio" \
@@ -999,6 +999,29 @@ RUN \
 # # hadolint ignore=DL4006
 # RUN 'driftctl completion powershell | Out-String | Invoke-Expression' | Out-File -Append -Encoding ascii "$PROFILE"
 # SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+#  ╭──────────────────────────────────────────────────────────╮
+#  │                   package manager                        │
+#  ╰──────────────────────────────────────────────────────────╯
+# NOTE: updating packages and installing large packages when gitpod container launches.
+# This is to minimize the image size during build time as large
+# images can lead to Gitpod build timing out
+RUN \
+[ ! -d "${HOME}/.init.d/" ] && ( mkdir "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
+( \
+  echo '#!/usr/bin/env bash' \
+  echo 'self="$(realpath -s "${BASH_SOURCE[0]}")";' \
+  echo '[ ! -r "/.pacman-bootstrap" ] &&' \
+  echo '{' \
+  echo '  sudo pacman --quiet --noprogressbar -Syyu --noconfirm ;' \
+  echo '  sudo pacman --quiet --noprogressbar -Syy --noconfirm --needed \' \
+  echo '    "azure-cli" \' \
+  echo '    "chaotic-aur/google-cloud-cli" ;' \
+  echo '  sudo touch "/.pacman-bootstrap" ;' \
+  echo '};' \
+  echo 'rm "${self}" ;' ; \
+) | tee "${HOME}/.init.d/pacman.sh" > /dev/null \
+&& chmod +x "${HOME}/.init.d/pacman.sh" \
+&& chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/pacman.sh" \
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                   user profile config                    │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -1139,7 +1162,9 @@ RUN \
   ) | tee '/entrypoint' > /dev/null \
   && chmod +x '/entrypoint' \
   && chown "$(id -u "${USER}"):$(id -g "${USER}")" '/entrypoint';
-RUN du --human-readable --max-depth 1 "${HOME}" > /.size
+RUN \
+du --human-readable --max-depth 1 "${HOME}" > /.size \
+&& expac --humansize M "%n %m" -l'\n' -Q $(pacman -Qq) | sort -hk 2 > /.package-size
 USER "${USER}"
 VOLUME ["${HOME}","${WORKDIR}"]
 ENV TERM="xterm"
