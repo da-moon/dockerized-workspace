@@ -541,7 +541,7 @@ RUN \
   && echo 'export PATH="$(npm -g bin):${PATH}" ;' > "/etc/profile.d/npm.sh" || exit 1 \
   && pacman --quiet --noprogressbar -S --noconfirm --needed "yarn" \
   && yarn --version >/dev/null 2>&1 \
-  && echo 'export PATH="$(yarn global bin):${PATH}" ;' > "/etc/profile.d/yarn.sh" || exit 1 ; \
+  && echo 'export PATH="$(yarn global bin):${PATH}" ;' > "/etc/profile.d/yarn.sh" || exit 1 \
   && npm install --silent -g \
     "github-label-sync" \
     "remark" \
