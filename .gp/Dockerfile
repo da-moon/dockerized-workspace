@@ -354,14 +354,14 @@ RUN \
   #  │                     go setup                             │
   #  ╰──────────────────────────────────────────────────────────╯
   go version > /dev/null 2>&1 && ( \
-  echo 'export PATH="${PATH}:$(go env GOPATH)/bin";' ; \
+    echo 'export PATH="${PATH}:$(go env GOPATH)/bin";' ; \
   ) | tee "/etc/profile.d/go.sh" > /dev/null || exit 1 ; \
   #  ╭──────────────────────────────────────────────────────────╮
   #  │                     ruby setup                           │
   #  ╰──────────────────────────────────────────────────────────╯
   gem --version > /dev/null 2>&1 && ( \
-  echo 'export GEM_HOME="$(ruby -e "puts Gem.user_dir")";' ; \
-  echo 'export PATH="${PATH}:${GEM_HOME}/bin";' ; \
+    echo 'export GEM_HOME="$(ruby -e "puts Gem.user_dir")";' ; \
+    echo 'export PATH="${PATH}:${GEM_HOME}/bin";' ; \
   ) | tee "/etc/profile.d/ruby.sh" > /dev/null || exit 1 ; \
   #  ╭──────────────────────────────────────────────────────────╮
   #  │                     python setup                         │
@@ -381,11 +381,10 @@ RUN \
   #  │                 powershell init                          │
   #  ╰──────────────────────────────────────────────────────────╯
   pwsh --version && ( \
-  pwsh -c ' \
+    pwsh -c ' \
   $parent=Split-Path -parent $PROFILE ; if (-not(Test-Path -Path $parent -PathType Container)) {$null = New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop} \
   ' ; \
-  ) || exit 0 ; \
-  ) ; \
+  ) || exit 1 ; \
   # ─── USE DELTA FOR GIT DIFFS ────────────────────────────────────────────────────
   delta --version > /dev/null 2>&1 && ( \
   git config --system pager.diff delta \
