@@ -146,7 +146,19 @@ RUN \
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet --noprogressbar -S --noconfirm --needed "base-devel" "upx" "git" \
+  pacman --quiet --noprogressbar -S --noconfirm --needed \
+    "base-devel" \
+    "upx" \
+    "git" \
+    "openssh" \
+    "man-db" \
+    "wget" \
+    "curl" \
+    "jq" \
+    "unzip" \
+    "unrar" \
+    "expac" \
+    "bash-completion" \
   # ─── GIT CONFIG ───────────────────────────────────────────────────────────
   && git --version > /dev/null 2>&1 && ( \
     git config --system 'format.signoff'                                  'true' ; \
@@ -227,23 +239,6 @@ RUN \
     git config --system "alias.commit-count"                              '!git log --date=short --pretty=format:%ad | sort | uniq -c' ; \
     git config --system "alias.commit-count-ordered"                      '!git log --date=short --pretty=format:%ad | sort | uniq -c | sort -r | head' ; \
   ) || exit 1 ; \
-  compress-packages ;
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                    install core tools                    │
-#  ╰──────────────────────────────────────────────────────────╯
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet --noprogressbar -S --noconfirm --needed \
-  "openssh" \
-  "man-db" \
-  "wget" \
-  "curl" \
-  "jq" \
-  "unzip" \
-  "unrar" \
-  "expac" \
-  "bash-completion" ; \
   compress-packages ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │              install core pakages from aur               │
@@ -520,7 +515,7 @@ RUN \
   echo 'export RUSTUP_HOME="${HOME}/.rustup";' ; \
   echo 'export CARGO_HOME="${HOME}/.cargo";' ; \
   echo 'export PATH="${PATH}:${CARGO_HOME}/bin";' ; \
-  ) | tee -a "/etc/profile.d/00-rust.sh" > /dev/null \
+  ) | tee -a "/etc/profile.d/00-rust" > /dev/null \
   rustup toolchain install "stable" \
   && cargo install --locked --git "https://hg.sr.ht/~cyplo/legdur" \
   && cargo install --locked --git "https://github.com/flatt-security/shisho.git" \
@@ -633,7 +628,7 @@ RUN \
   echo '    flock -s 20 ;' ; \
   echo '    echo "[ $(basename -s.sh "${self}") ] : cleaning up self..." ;' ; \
   echo '    flock -u 20 ;' ; \
-  echo '    rm "${self}" ;' ; \
+  echo '    # rm "${self}" ;' ; \
   echo '  } 20<"${lockfile}"' ; \
   echo '  [ -r "${lockfile}" ] && rm "${lockfile}" ;' ; \
   echo 'fi' ; \
@@ -746,7 +741,7 @@ RUN \
   echo '    [ -r "${lockfile}" ] && rm "${lockfile}" ;' ; \
   echo '  fi' ; \
   echo 'done ;' ; \
-  echo 'rm "${self}" ;' ; \
+  echo '# rm "${self}" ;' ; \
   ) | tee "${HOME}/.init.d/tflint.sh" > /dev/null \
   && chmod +x "${HOME}/.init.d/tflint.sh" \
   && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/tflint.sh"  ; \
@@ -806,137 +801,256 @@ RUN \
 # # hadolint ignore=DL4006
 # RUN 'driftctl completion powershell | Out-String | Invoke-Expression' | Out-File -Append -Encoding ascii "$PROFILE"
 # SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                   package manager                        │
-#  ╰──────────────────────────────────────────────────────────╯
-# NOTE: updating packages and installing large packages when gitpod container launches.
-# This is to minimize the image size during build time as large
-# images can lead to Gitpod build timing out
-RUN \
-  [ ! -d "${HOME}/.init.d/" ] && ( mkdir "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
-  ( \
-  echo '#!/usr/bin/env bash' ; \
-  echo 'export PIP_NO_CACHE_DIR="off"' ; \
-  echo 'export MAKEFLAGS="-j$(nproc)"' ; \
-  echo 'export CGO_ENABLED=1' ; \
-  echo 'export CGO_LDFLAGS="-g -O2"' ; \
-  echo 'self="$(realpath -s "${BASH_SOURCE[0]}")"' ; \
-  echo '[ ! -r "/.extra-pkgs" ] && (' ; \
-  echo '  sudo pacman -Syyu --noconfirm \' ; \
-  echo '  && paru -S --noconfirm --needed --removemake --cleanafter \' ; \
-  echo '      "aur/ttdl" \' ; \
-  echo '      "aur/devc-bin" \' ; \
-  echo '      "aur/nodejs-cspell" \' ; \
-  echo '      "aur/commitlint" \' ; \
-  echo '      "aur/commitlint-config-conventional" \' ; \
-  echo '      "aur/earthly-bin" \' ; \
-  echo '      "aur/forgit" \' ; \
-  echo '      "aur/git-fuzzy-git" \' ; \
-  echo '      "aur/git-completion" \' ; \
-  echo '      "aur/git-shelf" \' ; \
-  echo '      "aur/diffsitter-bin" \' ; \
-  echo '      "aur/vendir-bin" \' ; \
-  echo '      "aur/qsv-bin" \' ; \
-  echo '      "aur/shellcheck-bin" \' ; \
-  echo '      "aur/docker-sbom" \' ; \
-  echo '      "aur/fzfx-git" \' ; \
-  echo '      "aur/fzf-extras" \' ; \
-  echo '      "aur/aura-bin" \' ; \
-  echo '      "aur/paru-bin" \' ; \
-  echo '      "aur/shellcheck-bin" \' ; \
-  echo '      "aur/terrascan" \' ; \
-  echo '      "aur/opa" \' ; \
-  echo '      "aur/pulumictl" \' ; \
-  echo '      "aur/infracost" \' ; \
-  echo '      "aur/k6" \' ; \
-  echo '      "aur/rancher-k3d-bin" \' ; \
-  echo '      "aur/envoyproxy-bin" \' ; \
-  echo '      "aur/gojira" \' ; \
-  echo '      "aur/litmusctl" \' ; \
-  echo '      "aur/inlyne-bin" \' ; \
-  echo '      "aur/jql" \' ; \
-  echo '      "aur/ripsecrets" \' ; \
-  echo '      "aur/rnr-bin" \' ; \
-  echo '      "aur/semgrep-bin" \' ; \
-  echo '      "aur/awk-language-server" \' ; \
-  echo '      "aur/dockerfile-language-server-bin" \' ; \
-  echo '      "aur/terraform-ls-bin" \' ; \
-  echo '      "aur/pipr-git" \' ; \
-  echo '      "chaotic-aur/google-cloud-cli" \' ; \
-  echo '      "cargo-make" \' ; \
-  echo '      "cargo-edit" \' ; \
-  echo '      "cargo-deny" \' ; \
-  echo '      "cargo-udeps" \' ; \
-  echo '      "cargo-expand" \' ; \
-  echo '      "cargo-update" \' ; \
-  echo '      "cargo-watch" \' ; \
-  echo '      "markdownlint" \' ; \
-  echo '      "consul-template" \' ; \
-  echo '      "packer" \' ; \
-  echo '      "azure-cli" \' ; \
-  echo '      "chaotic-aur/topgrade" \' ; \
-  echo '      "python-pre-commit" \' ; \
-  echo '      "python-certifi" \' ; \
-  echo '      "goreleaser" \' ; \
-  echo '      "shfmt" \' ; \
-  echo '      "nushell" \' ; \
-  echo '      "mage" \' ; \
-  echo '      "bottom" \' ; \
-  echo '      "cocogitto" \' ; \
-  echo '      "eva" \' ; \
-  echo '      "hck" \' ; \
-  echo '      "mdcat" \' ; \
-  echo '      "navi" \' ; \
-  echo '      "xh" \' ; \
-  echo '      "xcp" \' ; \
-  echo '      "neovim" \' ; \
-  echo '      "sd" \' ; \
-  echo '      "duf" \' ; \
-  echo '      "ncdu" \' ; \
-  echo '      "ripgrep-all" \' ; \
-  echo '      "fd" \' ; \
-  echo '      "tokei" \' ; \
-  echo '      "hyperfine" \' ; \
-  echo '      "bat-extras" \' ; \
-  echo '      "prettier" \' ; \
-  echo '      "entr" \' ; \
-  echo '      "podman" \' ; \
-  echo '      "docker-buildx" \' ; \
-  echo '      "docker-machine" \' ; \
-  echo '      "docker-scan" \' ; \
-  echo '      "docker-compose" \' ; \
-  echo '      "noto-fonts" \' ; \
-  echo '      "ttf-ubuntu-font-family" \' ; \
-  echo '      "ttf-font-awesome" \' ; \
-  echo '      "gitui" \' ; \
-  echo '      "rsync" \' ; \
-  echo '      "unrar" \' ; \
-  echo '      "dialog" \' ; \
-  echo '      "psutils" \' ; \
-  echo '      "rclone" \' ; \
-  echo '      "moreutils" \' ; \
-  echo '      "aws-cli-v2" \' ; \
-  echo '      "vector" \' ; \
-  echo '      "pulumi" \' ; \
-  echo '      "istio" \' ; \
-  echo '      "trivy" \' ; \
-  echo '      "python-lsp-jsonrpc" \' ; \
-  echo '      "python-lsp-black" \' ; \
-  echo '      "python-lsp-server" \' ; \
-  echo '      "bash-language-server" \' ; \
-  echo '      "yaml-language-server" \' ; \
-  echo '      "vscode-json-languageserver" \' ; \
-  echo '      "gopls" \' ; \
-  echo '      "marksman" \' ; \
-  echo '      "cfssl" \' ; \
-  echo '  && curl -fsSL "https://plandex.ai/install.sh" | bash > /dev/null 2>&1 \' ; \
-  echo '  && sudo touch "/.extra-pkgs" ;' ; \
-  echo ') \' ; \
-  echo ' && rm "${self}"' ; \
-  ) | tee "${HOME}/.init.d/pacman.sh" > /dev/null \
-  && chmod +x "${HOME}/.init.d/pacman.sh" \
-  && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/pacman.sh" ;
+# #  ╭──────────────────────────────────────────────────────────╮
+# #  │                   package manager                        │
+# #  ╰──────────────────────────────────────────────────────────╯
+# # NOTE: updating packages and installing large packages when gitpod container launches.
+# # This is to minimize the image size during build time as large
+# # images can lead to Gitpod build timing out
+# # TODO: split into pacman and paru
+# # TODO: lock mutex
+# # TODO: run pacman first then run paru
+# RUN \
+#   [ ! -d "${HOME}/.init.d/" ] && ( mkdir "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
+#   ( \
+#   echo '#!/usr/bin/env bash' ; \
+#   echo 'export PIP_NO_CACHE_DIR="off"' ; \
+#   echo 'export MAKEFLAGS="-j$(nproc)"' ; \
+#   echo 'export CGO_ENABLED=1' ; \
+#   echo 'export CGO_LDFLAGS="-g -O2"' ; \
+#   echo 'self="$(realpath -s "${BASH_SOURCE[0]}")"' ; \
+#   echo '[ ! -r "/.extra-pkgs" ] && (' ; \
+#   echo '  sudo pacman -Syyu --noconfirm \' ; \
+#   echo '  && paru -S --noconfirm --needed --removemake --cleanafter \' ; \
+#   echo '      "aur/ttdl" \' ; \
+#   echo '      "aur/devc-bin" \' ; \
+#   echo '      "aur/nodejs-cspell" \' ; \
+#   echo '      "aur/commitlint" \' ; \
+#   echo '      "aur/commitlint-config-conventional" \' ; \
+#   echo '      "aur/earthly-bin" \' ; \
+#   echo '      "aur/forgit" \' ; \
+#   echo '      "aur/git-fuzzy-git" \' ; \
+#   echo '      "aur/git-completion" \' ; \
+#   echo '      "aur/git-shelf" \' ; \
+#   echo '      "aur/diffsitter-bin" \' ; \
+#   echo '      "aur/vendir-bin" \' ; \
+#   echo '      "aur/qsv-bin" \' ; \
+#   echo '      "aur/shellcheck-bin" \' ; \
+#   echo '      "aur/docker-sbom" \' ; \
+#   echo '      "aur/fzfx-git" \' ; \
+#   echo '      "aur/fzf-extras" \' ; \
+#   echo '      "aur/aura-bin" \' ; \
+#   echo '      "aur/paru-bin" \' ; \
+#   echo '      "aur/shellcheck-bin" \' ; \
+#   echo '      "aur/terrascan" \' ; \
+#   echo '      "aur/opa" \' ; \
+#   echo '      "aur/pulumictl" \' ; \
+#   echo '      "aur/infracost" \' ; \
+#   echo '      "aur/k6" \' ; \
+#   echo '      "aur/rancher-k3d-bin" \' ; \
+#   echo '      "aur/envoyproxy-bin" \' ; \
+#   echo '      "aur/gojira" \' ; \
+#   echo '      "aur/litmusctl" \' ; \
+#   echo '      "aur/inlyne-bin" \' ; \
+#   echo '      "aur/jql" \' ; \
+#   echo '      "aur/ripsecrets" \' ; \
+#   echo '      "aur/rnr-bin" \' ; \
+#   echo '      "aur/semgrep-bin" \' ; \
+#   echo '      "aur/awk-language-server" \' ; \
+#   echo '      "aur/dockerfile-language-server-bin" \' ; \
+#   echo '      "aur/terraform-ls-bin" \' ; \
+#   echo '      "aur/pipr-git" \' ; \
+#   echo '      "chaotic-aur/google-cloud-cli" \' ; \
+#   echo '      "cargo-make" \' ; \
+#   echo '      "cargo-edit" \' ; \
+#   echo '      "cargo-deny" \' ; \
+#   echo '      "cargo-udeps" \' ; \
+#   echo '      "cargo-expand" \' ; \
+#   echo '      "cargo-update" \' ; \
+#   echo '      "cargo-watch" \' ; \
+#   echo '      "markdownlint" \' ; \
+#   echo '      "consul-template" \' ; \
+#   echo '      "packer" \' ; \
+#   echo '      "azure-cli" \' ; \
+#   echo '      "chaotic-aur/topgrade" \' ; \
+#   echo '      "python-pre-commit" \' ; \
+#   echo '      "python-certifi" \' ; \
+#   echo '      "goreleaser" \' ; \
+#   echo '      "shfmt" \' ; \
+#   echo '      "nushell" \' ; \
+#   echo '      "mage" \' ; \
+#   echo '      "bottom" \' ; \
+#   echo '      "cocogitto" \' ; \
+#   echo '      "eva" \' ; \
+#   echo '      "hck" \' ; \
+#   echo '      "mdcat" \' ; \
+#   echo '      "navi" \' ; \
+#   echo '      "xh" \' ; \
+#   echo '      "xcp" \' ; \
+#   echo '      "neovim" \' ; \
+#   echo '      "sd" \' ; \
+#   echo '      "duf" \' ; \
+#   echo '      "ncdu" \' ; \
+#   echo '      "ripgrep-all" \' ; \
+#   echo '      "fd" \' ; \
+#   echo '      "tokei" \' ; \
+#   echo '      "hyperfine" \' ; \
+#   echo '      "bat-extras" \' ; \
+#   echo '      "prettier" \' ; \
+#   echo '      "entr" \' ; \
+#   echo '      "podman" \' ; \
+#   echo '      "docker-buildx" \' ; \
+#   echo '      "docker-machine" \' ; \
+#   echo '      "docker-scan" \' ; \
+#   echo '      "docker-compose" \' ; \
+#   echo '      "noto-fonts" \' ; \
+#   echo '      "ttf-ubuntu-font-family" \' ; \
+#   echo '      "ttf-font-awesome" \' ; \
+#   echo '      "gitui" \' ; \
+#   echo '      "rsync" \' ; \
+#   echo '      "unrar" \' ; \
+#   echo '      "dialog" \' ; \
+#   echo '      "psutils" \' ; \
+#   echo '      "rclone" \' ; \
+#   echo '      "moreutils" \' ; \
+#   echo '      "aws-cli-v2" \' ; \
+#   echo '      "vector" \' ; \
+#   echo '      "pulumi" \' ; \
+#   echo '      "istio" \' ; \
+#   echo '      "trivy" \' ; \
+#   echo '      "python-lsp-jsonrpc" \' ; \
+#   echo '      "python-lsp-black" \' ; \
+#   echo '      "python-lsp-server" \' ; \
+#   echo '      "bash-language-server" \' ; \
+#   echo '      "yaml-language-server" \' ; \
+#   echo '      "vscode-json-languageserver" \' ; \
+#   echo '      "gopls" \' ; \
+#   echo '      "marksman" \' ; \
+#   echo '      "cfssl" \' ; \
+#   echo '  && curl -fsSL "https://plandex.ai/install.sh" | bash > /dev/null 2>&1 \' ; \
+#   echo '  && sudo touch "/.extra-pkgs" ;' ; \
+#   echo ') \' ; \
+#   echo ' && echo "${self}"' ; \
+#   ) | tee "${HOME}/.init.d/pacman" > /dev/null \
+#   && chmod +x "${HOME}/.init.d/pacman" \
+#   && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/pacman" ;
 
+USER "root"
+RUN \
+export PIP_NO_CACHE_DIR="off" ; \
+export MAKEFLAGS="-j$(nproc)" ; \
+export CGO_ENABLED=1 ; \
+export CGO_LDFLAGS="-g -O2" ; \
+pacman -Syyu --noconfirm \
+&& pacman -S --noconfirm --needed \
+  "cargo-make" \
+  "cargo-edit" \
+  "cargo-deny" \
+  "cargo-udeps" \
+  "cargo-expand" \
+  "cargo-update" \
+  "cargo-watch" \
+  "markdownlint" \
+  "consul-template" \
+  "packer" \
+  "azure-cli" \
+  "chaotic-aur/topgrade" \
+  "python-pre-commit" \
+  "python-certifi" \
+  "goreleaser" \
+  "shfmt" \
+  "nushell" \
+  "mage" \
+  "bottom" \
+  "cocogitto" \
+  "eva" \
+  "hck" \
+  "mdcat" \
+  "navi" \
+  "xh" \
+  "xcp" \
+  "neovim" \
+  "sd" \
+  "duf" \
+  "ncdu" \
+  "ripgrep-all" \
+  "fd" \
+  "tokei" \
+  "hyperfine" \
+  "bat-extras" \
+  "prettier" \
+  "entr" \
+  "podman" \
+  "docker-buildx" \
+  "docker-machine" \
+  "docker-scan" \
+  "docker-compose" \
+  "noto-fonts" \
+  "ttf-ubuntu-font-family" \
+  "ttf-font-awesome" \
+  "gitui" \
+  "rsync" \
+  "unrar" \
+  "dialog" \
+  "psutils" \
+  "rclone" \
+  "moreutils" \
+  "aws-cli-v2" \
+  "vector" \
+  "pulumi" \
+  "istio" \
+  "trivy" \
+  "python-lsp-jsonrpc" \
+  "python-lsp-black" \
+  "python-lsp-server" \
+  "bash-language-server" \
+  "yaml-language-server" \
+  "vscode-json-languageserver" \
+  "gopls" \
+  "marksman" \
+  "cfssl"  \
+  "chaotic-aur/google-cloud-cli" \
+&& su-exec "${USER}" paru -S --noconfirm --needed --removemake --cleanafter \
+  "aur/ttdl" \
+  "aur/devc-bin" \
+  "aur/nodejs-cspell" \
+  "aur/commitlint" \
+  "aur/commitlint-config-conventional" \
+  "aur/earthly-bin" \
+  "aur/forgit" \
+  "aur/git-fuzzy-git" \
+  "aur/git-completion" \
+  "aur/git-shelf" \
+  "aur/diffsitter-bin" \
+  "aur/vendir-bin" \
+  "aur/qsv-bin" \
+  "aur/shellcheck-bin" \
+  "aur/docker-sbom" \
+  "aur/fzfx-git" \
+  "aur/fzf-extras" \
+  "aur/aura-bin" \
+  "aur/paru-bin" \
+  "aur/shellcheck-bin" \
+  "aur/terrascan" \
+  "aur/opa" \
+  "aur/pulumictl" \
+  "aur/infracost" \
+  "aur/k6" \
+  "aur/rancher-k3d-bin" \
+  "aur/envoyproxy-bin" \
+  "aur/gojira" \
+  "aur/litmusctl" \
+  "aur/inlyne-bin" \
+  "aur/jql" \
+  "aur/ripsecrets" \
+  "aur/rnr-bin" \
+  "aur/semgrep-bin" \
+  "aur/awk-language-server" \
+  "aur/dockerfile-language-server-bin" \
+  "aur/terraform-ls-bin" \
+  "aur/pipr-git" \
+  && curl -fsSL "https://plandex.ai/install.sh" | bash > /dev/null 2>&1 \
+  && compress-packages ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                   user profile config                    │
 #  ╰──────────────────────────────────────────────────────────╯
