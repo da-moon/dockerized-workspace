@@ -208,248 +208,10 @@ RUN \
     rm -r "/tmp/"$(basename "${url%.git}")"" \
     && popd > /dev/null 2>&1 || exit 1 ; \
   done ; 
-#  ╭──────────────────────────────────────────────────────────
-#  │                       shells                             │
-#  ╰──────────────────────────────────────────────────────────╯
-USER "root"
-SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 # hadolint ignore=SC2016
 RUN \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  export PIP_NO_CACHE_DIR="off" ; \
-  export MAKEFLAGS="-j$(nproc)" ; \
-  AUR_CLONE_URLS=( \
-    "https://aur.archlinux.org/shellcheck-bin.git" \
-    "https://aur.archlinux.org/powershell-bin.git" \
-  ) ; \
-  pacman --quiet --noprogressbar -Syy --noconfirm --needed "shfmt" "nushell" "starship" ; \
-  for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
-    && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
-    && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
-    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noconfirm > /dev/null 2>&1 && break || sleep 15; done \
-    && popd > /dev/null 2>&1 || exit 1 ; \
-    rm -r "/tmp/"$(basename "${url%.git}")"" ; \
-  done ; \
-  pwsh --version > /dev/null 2>&1 ; \
-  starship --version > /dev/null 2>&1 \
-  && echo 'eval "$(starship init bash)" ;' > "/etc/profile.d/starship.sh" || exit 1 ; \
-  rm -rf "${HOME}/go/pkg/mod" ; \
-  compress-packages ;
-USER "${USER}"
-SHELL ["/usr/bin/pwsh", "-NoLogo", "-Command"]
-RUN $parent=Split-Path -parent $PROFILE ; if (-not(Test-Path -Path $parent -PathType Container)) {$null = New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop}
-SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 #  ╭──────────────────────────────────────────────────────────╮
-#  │                    virtualization                        │
-#  ╰──────────────────────────────────────────────────────────╯
-USER "root"
-# hadolint ignore=SC2016
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  AUR_CLONE_URLS=( \
-  "https://aur.archlinux.org/docker-sbom.git" \
-  ) ; \ 
-  for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
-    && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
-    && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
-    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noconfirm && break || sleep 15; done \
-    && popd > /dev/null 2>&1 || exit 1 ; \
-    rm -r "/tmp/"$(basename "${url%.git}")"" ; \
-  done ; \
-  rm -rf "${HOME}/go/pkg/mod" ; \
-  pacman --quiet -Syy --noconfirm --needed \
-  "podman" \
-  "docker" \
-  "docker-buildx" \
-  "docker-machine" \
-  "docker-scan" \
-  "docker-compose" > /dev/null 2>&1 ; \
-  ( \
-    echo '#!/bin/sh' ; \
-    echo 'sudoIf() { if [ "$(id -u)" -ne 0 ]; then sudo "$@"; else "$@"; fi }' ; \
-    # ─── DOCKER FROM DOCKER ─────────────────────────────────────────────────────────
-    echo 'if [ -r "/var/run/docker.sock" ];then' ; \
-    echo 'SOCKET_GID="$(stat -c "%g" "/var/run/docker.sock")" ; ' ; \
-    echo '  if [ "${SOCKET_GID}" != 0 ]; then' ; \
-    echo '      if [ "$(cat "/etc/group" | grep :${SOCKET_GID}:)" = "" ]; then sudoIf groupadd --gid "${SOCKET_GID}" "docker-host"; fi' ; \
-    echo '      if [ "$(id "$(whoami)" | grep -E "groups=.*(=|,)${SOCKET_GID}\(")" = "" ]; then sudoIf usermod -aG "${SOCKET_GID}" "$(whoami)"; fi' ; \
-    echo '  fi' ; \
-    echo 'fi' ; \
-  ) | tee '/usr/local/share/docker-from-docker.sh' > /dev/null \
-  && chmod +x '/usr/local/share/docker-from-docker.sh' ; \
-  ( \
-    echo "alias docker-run='docker run --rm -it -v \"\${PWD}:/workspace\"' ;" ; \
-    echo "alias docker-run-u='docker-run --user \"\$(id -u):\$(id -g)\"' ;" ; \
-    echo "alias ubuntu-c='docker-run -w \"/workspace\" ubuntu:hirsute' ;" ; \
-    echo "alias debian-c='docker-run -w \"/workspace\" debian:bullseye' ;" ; \
-    echo "alias alpine-c='docker-run -w \"/workspace\" alpine:edge' ;" ; \
-    echo "alias pureos-c='docker-run -w \"/workspace\" pureos/pureos:byzantium-slim' ;" ; \
-    echo "alias arch-c='docker-run -w \"/workspace\" archlinux bash -c \"pacman-key --init && pacman-key --populate \"archlinux\" && exec bash --login\"' ;" ; \
-    echo "alias gitlint='docker run -u \"\$(id -u):\$(id -g)\" -w \"/repo\" --rm -it --ulimit nofile=1024 -v \"\$(pwd):/repo\" \"jorisroovers/gitlint\"' ;" ; \
-    echo "alias gitleaks='docker run -u \"\$(id -u):\$(id -g)\" -v \"\$(pwd):/path\" -w \"/path\" --rm -it \"zricethezav/gitleaks:latest\"' ;" ; \
-    echo "alias code-server='docker-run --network host -d -u \"\$(id -u):\$(id -g)\" \"codercom/code-server:latest\" --auth none' ;" ; \
-    echo "alias rmcontainers='docker ps -aq | xargs -r docker rm -f' ;" ; \
-    echo "alias gitlint='docker run -u \"\$(id -u):\$(id -g)\" -w \"/repo\" --rm -it --ulimit nofile=1024 -v \"\$(pwd):/repo\" \"jorisroovers/gitlint\"' ;" ; \
-    echo "alias reveal-md='docker run --rm  -u \"\$(id -u):\$(id -g)\" -p \"1948:1948\" -p \"35729:35729\" -v \"\$(pwd):/slides\" \"webpronl/reveal-md:latest\" /slides --watch' ;" ; \
-  ) | tee "/etc/profile.d/docker.sh" > /dev/null || exit 1 ;
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                          fonts                           │
-#  ╰──────────────────────────────────────────────────────────╯
-USER "root"
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet -Syy --noconfirm --needed \
-  "noto-fonts" \
-  "ttf-ubuntu-font-family" \
-  "ttf-font-awesome" > /dev/null 2>&1 ; \
-  compress-packages ;
-
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                          gitpod                          │
-#  ╰──────────────────────────────────────────────────────────╯
-# hadolint ignore=SC2016
-RUN \
-  ( \
-  # ensures shell always has the latest gipod variables
-  echo 'if gp version > /dev/null 2>&1 ; then' ;\
-  echo '  eval "$(gp env --export)" ;' ;\
-  echo 'fi' ;\
-  ) | tee "/etc/profile.d/gitpod.sh" > /dev/null || exit 1
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                     fuzzy finders                        │
-#  ╰──────────────────────────────────────────────────────────╯
-USER "root"
-# hadolint ignore=SC2016
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  export PIP_NO_CACHE_DIR="off" ; \
-  export MAKEFLAGS="-j$(nproc)" ; \
-  AUR_CLONE_URLS=( \
-  "https://aur.archlinux.org/fzfx-git.git" \
-  "https://aur.archlinux.org/fzf-extras.git" \
-  ) ; \
-  pacman --quiet -Syy --noconfirm --needed \
-    "fzf" > /dev/null 2>&1 ; \
-  for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
-    && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
-    && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
-    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noconfirm  > /dev/null 2>&1&& break || sleep 15; done \
-    && popd > /dev/null 2>&1 || exit 1 ; \
-    rm -r "/tmp/"$(basename "${url%.git}")"" ; \
-  done ; \
-  rm -rf "${HOME}/go/pkg/mod" ; \
-  fzf --version > /dev/null 2>&1 && ( \
-  echo '_fzf_complete_make() {' ; \
-  echo '  FZF_COMPLETION_TRIGGER="" _fzf_complete "-1" "${@}" < <(make -pqr 2>/dev/null \' ; \
-  echo '  | awk -F":" "/^[a-zA-Z0-9][^\$#\/\t=]*:([^=]|\$)/ {split(\$1,A,/ /);for(i in A)print A[i]}" \' ; \
-  echo '  | grep -v Makefile \' ; \
-  echo '  | sort -u)' ; \
-  echo '}' ; \
-  echo '[[ -n ${BASH} ]] && complete -F _fzf_complete_make -o default -o bashdefault make' ; \
-  echo '[ -r "/usr/share/fzf/key-bindings.bash" ] && source "/usr/share/fzf/key-bindings.bash"' ; \
-  echo '[ -r "/usr/share/fzf/completion.bash" ] && source "/usr/share/fzf/completion.bash"' ; \
-  ) | tee "/etc/profile.d/fzf.sh" > /dev/null || exit 1 ; \
-  compress-packages ;
-
-#  ╭──────────────────────────────────────────────────────────╮
-#  │               build tools and task runners               │
-#  ╰──────────────────────────────────────────────────────────╯
-USER "root"
-# hadolint ignore=SC2016
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  AUR_CLONE_URLS=( \
-  "https://aur.archlinux.org/go-task.git" \
-  "https://aur.archlinux.org/earthly-bin.git" \
-  ) ; \ 
-  pacman --quiet -Syy --noconfirm --needed "just" "make" ; \
-  for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
-    && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
-    && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
-    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noconfirm && break || sleep 15; done \
-    && popd > /dev/null 2>&1 || exit 1 ; \
-    rm -r "/tmp/"$(basename "${url%.git}")"" ; \
-  done ; \
-  rm -rf "${HOME}/go/pkg/mod" ; \
-  go-task --version > /dev/null 2>&1 && ( \
-    ln -sf "$(which "go-task" 2>/dev/null)" "/usr/local/bin/task" ; \
-  ) || exit 1 ; \
-  just --version > /dev/null 2>&1 && ( \
-    echo 'eval "$(just --completions bash)" ;' > "/etc/profile.d/just.sh" ; \
-  ) || exit 1 ; \
-  compress-packages ;
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                          git                             │
-#  ╰──────────────────────────────────────────────────────────╯
-USER "root"
-# hadolint ignore=SC2016
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  export PIP_NO_CACHE_DIR="off" ; \
-  export MAKEFLAGS="-j$(nproc)" ; \
-  AUR_CLONE_URLS=( \
-  "https://aur.archlinux.org/forgit.git" \
-  "https://aur.archlinux.org/git-fuzzy-git.git" \
-  "https://aur.archlinux.org/git-completion.git" \
-  "https://aur.archlinux.org/git-shelf.git" \
-  "https://aur.archlinux.org/diffsitter-bin.git" \
-  "https://aur.archlinux.org/vendir-bin.git" \
-  ) ; \
-  pacman --quiet --noprogressbar -Syy --noconfirm --needed \
-    "github-cli" \
-    "gitui" \
-    "git-delta" \
-    "difftastic" ; \
-  for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
-    && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
-    && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
-    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noconfirm && break || sleep 15; done \
-    && popd > /dev/null 2>&1 || exit 1 ; \
-    rm -r "/tmp/"$(basename "${url%.git}")"" ; \
-  done ; \
-  rm -rf "${HOME}/go/pkg/mod" ; \
-  gh --version > /dev/null 2>&1 && ( \
-    echo 'eval "$(gh completion -s bash)" ;' > "/etc/profile.d/gh.sh" ; \
-    pwsh --version && ( \
-      pwsh -c ' \
-      "Invoke-Expression -Command $(gh completion -s powershell | Out-String)" \
-      | Out-File -Append -Encoding ascii "$PROFILE" \
-      ' ; \
-    ) || exit 0 ; \
-  ) || exit 1 ; \
-  # ─── USE DELTA FOR GIT DIFFS ────────────────────────────────────────────────────
-  delta --version > /dev/null 2>&1 && ( \
-  git config --system pager.diff delta \
-  && git config --system pager.log delta \
-  && git config --system pager.reflog delta \
-  && git config --system pager.show delta \
-  && git config --system interactive.difffilter "delta --color-only --features=interactive" \
-  && git config --system delta.features "side-by-side line-numbers decorations" \
-  && git config --system delta.whitespace-error-style "22 reverse" \
-  && git config --system delta.decorations.commit-decoration-style "bold yellow box ul" \
-  && git config --system delta.decorations.file-style "bold yellow ul" \
-  && git config --system delta.decorations.file-decoration-style "none" \
-  && git config --system delta.decorations.commit-style "raw" \
-  && git config --system delta.decorations.hunk-header-decoration-style "blue box" \
-  && git config --system delta.decorations.hunk-header-file-style "red" \
-  && git config --system delta.decorations.hunk-header-line-number-style "#067a00" \
-  && git config --system delta.decorations.hunk-header-style "file line-number syntax" \
-  && git config --system delta.interactive.keep-plus-minus-markers "false" \
-  ) || exit 1 ; \
-  compress-packages ;
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                  modern cli applications                 │
+#  │                          dev tools                       │
 #  ╰──────────────────────────────────────────────────────────╯
 USER "root"
 ENV COLORTERM="truecolor"
@@ -460,19 +222,24 @@ ENV _ZO_DATA_DIR="/workspace/zoxide/"
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
+  export PIP_NO_CACHE_DIR="off" ; \
   export MAKEFLAGS="-j$(nproc)" ; \
   AUR_CLONE_URLS=( \
-    "https://aur.archlinux.org/qsv-bin.git" \
+  "https://aur.archlinux.org/shellcheck-bin.git" \
+  "https://aur.archlinux.org/powershell-bin.git" \
+  "https://aur.archlinux.org/docker-sbom.git" \
+  "https://aur.archlinux.org/fzfx-git.git" \
+  "https://aur.archlinux.org/fzf-extras.git" \
+  "https://aur.archlinux.org/go-task.git" \
+  "https://aur.archlinux.org/earthly-bin.git" \
+  "https://aur.archlinux.org/forgit.git" \
+  "https://aur.archlinux.org/git-fuzzy-git.git" \
+  "https://aur.archlinux.org/git-completion.git" \
+  "https://aur.archlinux.org/git-shelf.git" \
+  "https://aur.archlinux.org/diffsitter-bin.git" \
+  "https://aur.archlinux.org/vendir-bin.git" \
+  "https://aur.archlinux.org/qsv-bin.git" \
   ) ; \
-  for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
-    && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
-    && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
-    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noconfirm && break || sleep 15; done \
-    && popd > /dev/null 2>&1 || exit 1 ; \
-    rm -r "/tmp/"$(basename "${url%.git}")"" ; \
-  done ; \
-  rm -rf "${HOME}/go/pkg/mod" ; \
   pacman --quiet --noprogressbar -Syy --noconfirm --needed \
     "chaotic-aur/topgrade" \
     "bottom" \
@@ -503,6 +270,111 @@ RUN \
     "prettier" \
     "rustfmt" \
     "entr" ; \
+    "podman" \
+    "docker" \
+    "docker-buildx" \
+    "docker-machine" \
+    "docker-scan" \
+    "docker-compose" \
+    "noto-fonts" \
+    "ttf-ubuntu-font-family" \
+    "ttf-font-awesome" \
+    "fzf" \
+    "github-cli" \
+    "gitui" \
+    "git-delta" \
+    "difftastic" ; \
+  for url in "${AUR_CLONE_URLS[@]}";do \
+    git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
+    && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
+    && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
+    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noconfirm && break || sleep 15; done \
+    && popd > /dev/null 2>&1 || exit 1 ; \
+    rm -r "/tmp/"$(basename "${url%.git}")"" ; \
+  done ; \
+  rm -rf "${HOME}/go/pkg/mod" ; \
+  ( \
+    # ensures shell always has the latest gipod variables
+    echo 'if gp version > /dev/null 2>&1 ; then' ;\
+    echo '  eval "$(gp env --export)" ;' ;\
+    echo 'fi' ;\
+  ) | tee "/etc/profile.d/gitpod.sh" > /dev/null || exit 1 \
+  ( \
+    echo '#!/bin/sh' ; \
+    echo 'sudoIf() { if [ "$(id -u)" -ne 0 ]; then sudo "$@"; else "$@"; fi }' ; \
+    # ─── DOCKER FROM DOCKER ─────────────────────────────────────────────────────────
+    echo 'if [ -r "/var/run/docker.sock" ];then' ; \
+    echo 'SOCKET_GID="$(stat -c "%g" "/var/run/docker.sock")" ; ' ; \
+    echo '  if [ "${SOCKET_GID}" != 0 ]; then' ; \
+    echo '      if [ "$(cat "/etc/group" | grep :${SOCKET_GID}:)" = "" ]; then sudoIf groupadd --gid "${SOCKET_GID}" "docker-host"; fi' ; \
+    echo '      if [ "$(id "$(whoami)" | grep -E "groups=.*(=|,)${SOCKET_GID}\(")" = "" ]; then sudoIf usermod -aG "${SOCKET_GID}" "$(whoami)"; fi' ; \
+    echo '  fi' ; \
+    echo 'fi' ; \
+  ) | tee '/usr/local/share/docker-from-docker.sh' > /dev/null \
+  && chmod +x '/usr/local/share/docker-from-docker.sh' ; \
+  ( \
+    echo "alias docker-run='docker run --rm -it -v \"\${PWD}:/workspace\"' ;" ; \
+    echo "alias docker-run-u='docker-run --user \"\$(id -u):\$(id -g)\"' ;" ; \
+    echo "alias ubuntu-c='docker-run -w \"/workspace\" ubuntu:hirsute' ;" ; \
+    echo "alias debian-c='docker-run -w \"/workspace\" debian:bullseye' ;" ; \
+    echo "alias alpine-c='docker-run -w \"/workspace\" alpine:edge' ;" ; \
+    echo "alias pureos-c='docker-run -w \"/workspace\" pureos/pureos:byzantium-slim' ;" ; \
+    echo "alias arch-c='docker-run -w \"/workspace\" archlinux bash -c \"pacman-key --init && pacman-key --populate \"archlinux\" && exec bash --login\"' ;" ; \
+    echo "alias gitlint='docker run -u \"\$(id -u):\$(id -g)\" -w \"/repo\" --rm -it --ulimit nofile=1024 -v \"\$(pwd):/repo\" \"jorisroovers/gitlint\"' ;" ; \
+    echo "alias gitleaks='docker run -u \"\$(id -u):\$(id -g)\" -v \"\$(pwd):/path\" -w \"/path\" --rm -it \"zricethezav/gitleaks:latest\"' ;" ; \
+    echo "alias code-server='docker-run --network host -d -u \"\$(id -u):\$(id -g)\" \"codercom/code-server:latest\" --auth none' ;" ; \
+    echo "alias rmcontainers='docker ps -aq | xargs -r docker rm -f' ;" ; \
+    echo "alias gitlint='docker run -u \"\$(id -u):\$(id -g)\" -w \"/repo\" --rm -it --ulimit nofile=1024 -v \"\$(pwd):/repo\" \"jorisroovers/gitlint\"' ;" ; \
+    echo "alias reveal-md='docker run --rm  -u \"\$(id -u):\$(id -g)\" -p \"1948:1948\" -p \"35729:35729\" -v \"\$(pwd):/slides\" \"webpronl/reveal-md:latest\" /slides --watch' ;" ; \
+  ) | tee "/etc/profile.d/docker.sh" > /dev/null || exit 1 ; \
+  pwsh --version > /dev/null 2>&1 ; \
+  starship --version > /dev/null 2>&1 \
+  && echo 'eval "$(starship init bash)" ;' > "/etc/profile.d/starship.sh" || exit 1 ; \
+  gh --version > /dev/null 2>&1 && ( \
+    echo 'eval "$(gh completion -s bash)" ;' > "/etc/profile.d/gh.sh" ; \
+    pwsh --version && ( \
+      pwsh -c ' \
+      "Invoke-Expression -Command $(gh completion -s powershell | Out-String)" \
+      | Out-File -Append -Encoding ascii "$PROFILE" \
+      ' ; \
+    ) || exit 0 ; \
+  ) || exit 1 ; \
+  # ─── USE DELTA FOR GIT DIFFS ────────────────────────────────────────────────────
+  delta --version > /dev/null 2>&1 && ( \
+  git config --system pager.diff delta \
+  && git config --system pager.log delta \
+  && git config --system pager.reflog delta \
+  && git config --system pager.show delta \
+  && git config --system interactive.difffilter "delta --color-only --features=interactive" \
+  && git config --system delta.features "side-by-side line-numbers decorations" \
+  && git config --system delta.whitespace-error-style "22 reverse" \
+  && git config --system delta.decorations.commit-decoration-style "bold yellow box ul" \
+  && git config --system delta.decorations.file-style "bold yellow ul" \
+  && git config --system delta.decorations.file-decoration-style "none" \
+  && git config --system delta.decorations.commit-style "raw" \
+  && git config --system delta.decorations.hunk-header-decoration-style "blue box" \
+  && git config --system delta.decorations.hunk-header-file-style "red" \
+  && git config --system delta.decorations.hunk-header-line-number-style "#067a00" \
+  && git config --system delta.decorations.hunk-header-style "file line-number syntax" \
+  && git config --system delta.interactive.keep-plus-minus-markers "false" \
+  ) || exit 1 ; \
+  go-task --version > /dev/null 2>&1 && ( \
+    ln -sf "$(which "go-task" 2>/dev/null)" "/usr/local/bin/task" ; \
+  ) || exit 1 ; \
+  just --version > /dev/null 2>&1 && ( \
+    echo 'eval "$(just --completions bash)" ;' > "/etc/profile.d/just.sh" ; \
+  ) || exit 1 ; \
+  fzf --version > /dev/null 2>&1 && ( \
+  echo '_fzf_complete_make() {' ; \
+  echo '  FZF_COMPLETION_TRIGGER="" _fzf_complete "-1" "${@}" < <(make -pqr 2>/dev/null \' ; \
+  echo '  | awk -F":" "/^[a-zA-Z0-9][^\$#\/\t=]*:([^=]|\$)/ {split(\$1,A,/ /);for(i in A)print A[i]}" \' ; \
+  echo '  | grep -v Makefile \' ; \
+  echo '  | sort -u)' ; \
+  echo '}' ; \
+  echo '[[ -n ${BASH} ]] && complete -F _fzf_complete_make -o default -o bashdefault make' ; \
+  echo '[ -r "/usr/share/fzf/key-bindings.bash" ] && source "/usr/share/fzf/key-bindings.bash"' ; \
+  echo '[ -r "/usr/share/fzf/completion.bash" ] && source "/usr/share/fzf/completion.bash"' ; \
+  ) | tee "/etc/profile.d/fzf.sh" > /dev/null || exit 1 ; \
   zoxide --version && ( \
     ( \
       echo 'export _ZO_DATA_DIR="/workspace/zoxide" ; ' ; \
@@ -543,6 +415,10 @@ RUN \
     echo 'wget -qO "${HOME}/.config/xplr/init.lua" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/xplr/init.lua" ;' ; \
   ) | tee "/etc/profile.d/xplr.sh" > /dev/null  || exit 1 ; \
   compress-packages ;
+USER "${USER}"
+SHELL ["/usr/bin/pwsh", "-NoLogo", "-Command"]
+RUN $parent=Split-Path -parent $PROFILE ; if (-not(Test-Path -Path $parent -PathType Container)) {$null = New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop}
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 # #  ────────────────────────────────────────────────────────────
 # #  ╭──────────────────────────────────────────────────────────╮
 # #  │                 rust setup                               │
