@@ -147,11 +147,85 @@ RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   pacman --quiet --noprogressbar -S --noconfirm --needed "base-devel" "upx" "git" \
-  # ─── BASE GIT CONFIGS ───────────────────────────────────────────────────────────
+  # ─── GIT CONFIG ───────────────────────────────────────────────────────────
   && git --version > /dev/null 2>&1 && ( \
-  git config --system push.recurseSubmodules "on-demand" \
-  && git config --system diff.submodule "log" \
-  && git config --system status.submoduleSummary "true" \
+    git config --system 'format.signoff'                                  'true' ; \
+    git config --system 'init.defaultBranch'                              'master' ; \
+    git config --system 'core.attributesfile'                             '.gitattributes' ; \
+    git config --system 'core.autocrlf'                                   'false' ; \
+    git config --system 'tag.forceSignAnnotated'                          'true' ; \
+    git config --system 'push.recursesubmodules'                          'on-demand' ; \
+    git config --system 'pull.rebase'                                     'true' ; \
+    git config --system 'rebase.autostash'                                'true' ; \
+    git config --system 'status.submodulesummary'                         'true' ; \
+    git config --system 'pager.diff'                                      '[ -x "$(command -v delta)" ] && delta || less --tab=2 -RFX' ; \
+    git config --system 'pager.grep'                                      '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
+    git config --system 'pager.blame'                                     '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
+    git config --system 'pager.log'                                       '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
+    git config --system 'pager.reflog'                                    '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
+    git config --system 'pager.show'                                      '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
+    git config --system 'diff.submodule'                                  'log' ; \
+    git config --system 'diff.tool'                                       'difftastic' ; \
+    git config --system 'diff.image.command'                              'compare $2 $1 png:- | montage -geometry +4+4 $2 - $1 png:- | display -title "$1"' ; \
+    git config --system 'diff.difftastic.command'                         'difft' ; \
+    git config --system 'diff.difftastic.binary'                          'true' ; \
+    git config --system 'difftool.prompt'                                 'false' ; \
+    git config --system 'difftool.difftastic.cmd'                         'difft --color always $LOCAL $REMOTE' ; \
+    git config --system 'difftool.delta.cmd'                              'diff -u --unified=3 --ignore-case -w $LOCAL $REMOTE | delta' ; \
+    git config --system 'gui.editor'                                      'code -w' ; \
+    git config --system 'fetch.prune'                                     'true' ; \
+    git config --system 'merge.log'                                       'true' ; \
+    git config --system 'merge.tool'                                      'code' ; \
+    git config --system 'mergetool.code.cmd'                              'code --wait --merge $REMOTE $LOCAL $BASE $MERGED' ; \
+    git config --system 'alias.view-contributors'                         'shortlog -e -s -n' ; \
+    git config --system 'alias.upstream'                                  'remote get-url origin' ; \
+    git config --system 'alias.root'                                      'rev-parse --show-toplevel' ; \
+    git config --system 'alias.scope'                                     'rev-parse --show-prefix' ; \
+    git config --system 'alias.url'                                       'ls-remote --get-url' ; \
+    git config --system 'alias.aliases'                                   'config --get-regexp alias' ; \
+    git config --system 'alias.spush'                                     'push --recurse-submodules=on-demand' ; \
+    git config --system 'alias.sfetch'                                    'submodule foreach --recursive git fetch' ; \
+    git config --system 'alias.supdate'                                   'submodule update --remote --merge' ; \
+    git config --system 'alias.default-branch'                            'rev-parse --abbrev-ref HEAD' ; \
+    git config --system 'alias.current-branch'                            '!git for-each-ref --format="%(upstream:short)" $(git symbolic-ref -q HEAD)' ; \
+    git config --system 'alias.branch-prune'                              '!git fetch -p && for b in $(git for-each-ref --format="%(if:equals=[gone])%(upstream:track)%(then)%(refname:short)%(end)" refs/heads); do git branch -d $b; done' ; \
+    git config --system 'alias.ca'                                        'commit --signoff --gpg-sign --amend --reuse-message=HEAD' ; \
+    git config --system 'alias.c'                                         'commit --signoff --gpg-sign' ; \
+    git config --system 'alias.cF'                                        '!git commit --signoff --gpg-sign --file=$(git rev-parse --show-toplevel)/.git/COMMIT_EDITMSG' ; \
+    git config --system 'alias.codegpt'                                   '! codegpt commit --preview' ; \
+    git config --system 'alias.commit-edit-message'                       '! $EDITOR $(git rev-parse --show-toplevel)/.git/COMMIT_EDITMSG' ; \
+    git config --system 'alias.commit-summary'                            'log --color --graph --pretty=format:"%C(red)%h%C(reset) %s %C(bold blue)[%an](mailto:%ae)%C(reset) %C(green)%C(bold)%cr" --abbrev-commit' ; \
+    git config --system 'alias.head-hash'                                 'rev-parse HEAD' ; \
+    git config --system 'alias.latest-commit'                             'log -1 HEAD --stat' ; \
+    git config --system 'alias.untracked'                                 'ls-files --others --exclude-standard' ; \
+    git config --system 'alias.tracked'                                   '!git ls-tree -r $(git symbolic-ref --quiet --short HEAD || git rev-parse HEAD) --name-only' ; \
+    git config --system 'alias.tags'                                      'for-each-ref --format="%(refname:short) (%(committerdate:relative))" --sort=committerdate refs/tags' ; \
+    git config --system 'alias.latest-tag'                                '!git describe --tags $(git rev-list --tags --max-count=1 2>/dev/null) 2>/dev/null' ; \
+    git config --system 'alias.release-notes'                             'log --color --pretty=format:"* %C(red)%h%C(reset) %s %C(bold blue)[%an](mailto:%ae)%C(reset)" --abbrev-commit --dense --no-merges' ; \
+    git config --system 'alias.staged'                                    'diff --name-only --staged' ; \
+    git config --system 'alias.re-stage'                                  'git add $(git diff --name-only --staged)' ; \
+    git config --system 'alias.difft'                                     'difftool --tool difftastic' ; \
+    git config --system 'alias.diffd'                                     'difftool --tool delta' ; \
+    git config --system 'alias.not-staged'                                'diff-files --name-only -B -R -M' ; \
+    git config --system 'alias.all-changes'                               'diff --name-only HEAD' ; \
+    git config --system 'alias.ui'                                        '!f() { cd "$(git rev-parse --show-toplevel)" && gitui; }; f' ; \
+    git config --system 'alias.zipball'                                   '!git archive --format=zip --output=$(basename -s.git $(git remote get-url origin))-$(git describe --abbrev=0).zip $(git describe --abbrev=0)' ; \
+    git config --system 'alias.tarball'                                   '!git archive --format=tar.gz --output=$(basename -s.git $(git remote get-url origin))-$(git describe --abbrev=0).tar.gz $(git describe --abbrev=0)' ; \
+    git config --system 'alias.conflicts'                                 '! $EDITOR $(git diff --name-only --diff-filter=U)' ; \
+    git config --system 'alias.issues'                                    '! gh issue list --assignee "@me"' ; \
+    git config --system 'alias.changes'                                   'diff-index --name-only -B -R -M -C HEAD' ; \
+    git config --system 'alias.rel-changes'                               'ls-files -m -o --exclude-standard' ; \
+    git config --system 'alias.ignored'                                   'ls-files --others --ignored --exclude-standard' ; \
+    git config --system 'alias.modified-files'                            'diff --name-only' ; \
+    git config --system 'alias.restage'                                   '!git add $(git diff --name-only)' ; \
+    git config --system 'alias.stage-all'                                 '!git add $(git diff --name-only HEAD)' ; \
+    git config --system "alias.next-patch-release"                        '!git describe --tags $(git rev-list --tags --max-count=1 2>/dev/null) 2>/dev/null'"| awk -F. '{gsub(\"v\",\"\",\$1);printf \"%s.%s.%s\", \$1,\$2,\$3+1}END {if (NR==0){print \"0.0.1\"}}'" ; \
+    git config --system "alias.next-minor-release"                        '!git describe --tags $(git rev-list --tags --max-count=1 2>/dev/null) 2>/dev/null'"| awk -F. '{gsub(\"v\",\"\",\$1);printf \"%s.%s.0\", \$1,\$2+1}END {if (NR==0){print \"0.0.1\"}}'" ; \
+    git config --system "alias.next-major-release"                        '!git describe --tags $(git rev-list --tags --max-count=1 2>/dev/null) 2>/dev/null'"| awk -F. '{gsub(\"v\",\"\",\$1);printf \"%s.0.0\", \$1+1}END {if (NR==0){print \"0.0.1\"}}'" ; \
+    git config --system 'alias.fa'                                        '!f() { cd "$(git rev-parse --show-toplevel)" && git ls-files -m -o --exclude-standard | fzf -0 --print0 --multi --reverse --height=40% --tabstop=2 --prompt=" │ " --color="prompt:0,hl:178,hl+:178" --preview-window="right:60%" --height="80%" --bind="tab:ignore" --bind="shift-tab:ignore" --bind="ctrl-t:ignore" --bind="ctrl-g:ignore" --bind="right:toggle+down" --bind="left:toggle+up" --bind="ctrl-space:select-all" --bind="alt-space:deselect-all" --preview="git difftool --tool=delta  {}" | xargs -0 -t -o -I {} git add "{}";  }; f' ; \
+    git config --system "alias.spark"                                     '!git log --date=short --pretty=format:%ad | sort | uniq -c | awk "{print $1}" | spark' ; \
+    git config --system "alias.commit-count"                              '!git log --date=short --pretty=format:%ad | sort | uniq -c' ; \
+    git config --system "alias.commit-count-ordered"                      '!git log --date=short --pretty=format:%ad | sort | uniq -c | sort -r | head' ; \
   ) || exit 1 ; \
   compress-packages ;
 #  ╭──────────────────────────────────────────────────────────╮
