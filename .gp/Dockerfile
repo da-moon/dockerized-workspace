@@ -21,7 +21,7 @@ ENV WORKDIR "${WORKDIR}"
 #  ╰──────────────────────────────────────────────────────────╯
 # hadolint ignore=SC2016
 RUN \
-sed \
+  sed \
   -e '/XDG_/d' \
   -e '$aXDG_CACHE_HOME  DEFAULT=@{WORKDIR}/.cache' \
   -e '$aXDG_CONFIG_HOME DEFAULT=@{WORKDIR}/.config' \
@@ -42,17 +42,17 @@ sed \
   "/etc/pacman.conf" \
   # https://www.reddit.com/r/archlinux/comments/3ctiou/lpt_speed_up_makepkg_by_skippingparallelizing/
   && sed -i \
-    # skip running tests
-    -e 's/ check / !check /g' \
-    # use multiple cores
-    -e 's/COMPRESSXZ.*/COMPRESSXZ=(xz -T 0 -c -z -)/g' \
-    # skip compression
-    -e "s/PKGEXT.*/PKGEXT='.pkg.tar'/g" \
-    "/etc/makepkg.conf" \
+  # skip running tests
+  -e 's/ check / !check /g' \
+  # use multiple cores
+  -e 's/COMPRESSXZ.*/COMPRESSXZ=(xz -T 0 -c -z -)/g' \
+  # skip compression
+  -e "s/PKGEXT.*/PKGEXT='.pkg.tar'/g" \
+  "/etc/makepkg.conf" \
   && pacman-key --init > /dev/null 2>&1 \
   && pacman-key --populate "archlinux" > /dev/null 2>&1 \
   && ( \
-    echo 'alias pacman="sudo pacman"' ; \
+  echo 'alias pacman="sudo pacman"' ; \
   ) | tee "/etc/profile.d/pacman.sh" > /dev/null ;
 # ────────────────────────────────────────────────────────────
 ARG CHAOTIC_AUR_KEY="3056513887B78AEB"
@@ -61,11 +61,11 @@ RUN \
   pacman-key --recv-key "${CHAOTIC_AUR_KEY}" --keyserver "keyserver.ubuntu.com" > /dev/null 2>&1 \
   && pacman-key --lsign-key "${CHAOTIC_AUR_KEY}" > /dev/null 2>&1 \
   && pacman -U --noprogressbar --noconfirm \
-    'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' \
-    'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' \
+  'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' \
+  'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' \
   && ( \
-    echo '[chaotic-aur]' ; \
-    echo 'Include = /etc/pacman.d/chaotic-mirrorlist' ; \
+  echo '[chaotic-aur]' ; \
+  echo 'Include = /etc/pacman.d/chaotic-mirrorlist' ; \
   ) | tee -a "/etc/pacman.conf" > /dev/null ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 finding fastest sources                  │
@@ -121,7 +121,7 @@ RUN \
 #  │              install makepkg dependencies                │
 #  ╰──────────────────────────────────────────────────────────╯
 RUN \
-(\
+  (\
   echo 'SKIP_PKGS=(); \' ; \
   echo 'if [ -r "/tmp/.processed-pkgs" ]; then \' ; \
   echo '  readarray -t SKIP_PKGS < "/tmp/.processed-pkgs" ; \' ; \
@@ -141,8 +141,8 @@ RUN \
   echo 'done ; \' ; \
   echo 'printf "%s\n" "${BIN_LIST[@]}" | xargs -r -I {} -P "$(($(nproc)/4))" bash -c "upx -q \"{}\" || echo \"{}\" > /tmp/.failed-compress" ; \' ; \
   echo 'printf "%s\n" "${SKIP_PKGS[@]}" | tee "/tmp/.processed-pkgs" > /dev/null ;' ; \
-) | tee "/usr/local/bin/compress-packages" > /dev/null \
-&& chmod +x "/usr/local/bin/compress-packages" ;
+  ) | tee "/usr/local/bin/compress-packages" > /dev/null \
+  && chmod +x "/usr/local/bin/compress-packages" ;
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
@@ -186,12 +186,12 @@ RUN \
   "https://aur.archlinux.org/paru-bin.git" \
   ) ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
-    && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
-    for i in {1..5}; do makepkg -sicr --noconfirm && break || sleep 15; done ; \
-    rm -r "/tmp/"$(basename "${url%.git}")"" \
-    && popd > /dev/null 2>&1 || exit 1 ; \
-  done ; 
+  git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
+  && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
+  for i in {1..5}; do makepkg -sicr --noconfirm && break || sleep 15; done ; \
+  rm -r "/tmp/"$(basename "${url%.git}")"" \
+  && popd > /dev/null 2>&1 || exit 1 ; \
+  done ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                         docker                           │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -200,34 +200,34 @@ USER "root"
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet -S --noconfirm --needed "docker"  > /dev/null 2>&1 ; \
+  pacman --quiet -S --noconfirm --needed "docker" "docker-compose"  > /dev/null 2>&1 ; \
   ( \
-    echo '#!/bin/sh' ; \
-    echo 'sudoIf() { if [ "$(id -u)" -ne 0 ]; then sudo "$@"; else "$@"; fi }' ; \
-    # ─── DOCKER FROM DOCKER ─────────────────────────────────────────────────────────
-    echo 'if [ -r "/var/run/docker.sock" ];then' ; \
-    echo 'SOCKET_GID="$(stat -c "%g" "/var/run/docker.sock")" ; ' ; \
-    echo '  if [ "${SOCKET_GID}" != 0 ]; then' ; \
-    echo '      if [ "$(cat "/etc/group" | grep :${SOCKET_GID}:)" = "" ]; then sudoIf groupadd --gid "${SOCKET_GID}" "docker-host"; fi' ; \
-    echo '      if [ "$(id "$(whoami)" | grep -E "groups=.*(=|,)${SOCKET_GID}\(")" = "" ]; then sudoIf usermod -aG "${SOCKET_GID}" "$(whoami)"; fi' ; \
-    echo '  fi' ; \
-    echo 'fi' ; \
+  echo '#!/bin/sh' ; \
+  echo 'sudoIf() { if [ "$(id -u)" -ne 0 ]; then sudo "$@"; else "$@"; fi }' ; \
+  # ─── DOCKER FROM DOCKER ─────────────────────────────────────────────────────────
+  echo 'if [ -r "/var/run/docker.sock" ];then' ; \
+  echo 'SOCKET_GID="$(stat -c "%g" "/var/run/docker.sock")" ; ' ; \
+  echo '  if [ "${SOCKET_GID}" != 0 ]; then' ; \
+  echo '      if [ "$(cat "/etc/group" | grep :${SOCKET_GID}:)" = "" ]; then sudoIf groupadd --gid "${SOCKET_GID}" "docker-host"; fi' ; \
+  echo '      if [ "$(id "$(whoami)" | grep -E "groups=.*(=|,)${SOCKET_GID}\(")" = "" ]; then sudoIf usermod -aG "${SOCKET_GID}" "$(whoami)"; fi' ; \
+  echo '  fi' ; \
+  echo 'fi' ; \
   ) | tee '/usr/local/share/docker-from-docker.sh' > /dev/null \
   && chmod +x '/usr/local/share/docker-from-docker.sh' ; \
   ( \
-    echo "alias docker-run='docker run --rm -it -v \"\${PWD}:/workspace\"' ;" ; \
-    echo "alias docker-run-u='docker-run --user \"\$(id -u):\$(id -g)\"' ;" ; \
-    echo "alias ubuntu-c='docker-run -w \"/workspace\" ubuntu:hirsute' ;" ; \
-    echo "alias debian-c='docker-run -w \"/workspace\" debian:bullseye' ;" ; \
-    echo "alias alpine-c='docker-run -w \"/workspace\" alpine:edge' ;" ; \
-    echo "alias pureos-c='docker-run -w \"/workspace\" pureos/pureos:byzantium-slim' ;" ; \
-    echo "alias arch-c='docker-run -w \"/workspace\" archlinux bash -c \"pacman-key --init && pacman-key --populate \"archlinux\" && exec bash --login\"' ;" ; \
-    echo "alias gitlint='docker run -u \"\$(id -u):\$(id -g)\" -w \"/repo\" --rm -it --ulimit nofile=1024 -v \"\$(pwd):/repo\" \"jorisroovers/gitlint\"' ;" ; \
-    echo "alias gitleaks='docker run -u \"\$(id -u):\$(id -g)\" -v \"\$(pwd):/path\" -w \"/path\" --rm -it \"zricethezav/gitleaks:latest\"' ;" ; \
-    echo "alias code-server='docker-run --network host -d -u \"\$(id -u):\$(id -g)\" \"codercom/code-server:latest\" --auth none' ;" ; \
-    echo "alias rmcontainers='docker ps -aq | xargs -r docker rm -f' ;" ; \
-    echo "alias gitlint='docker run -u \"\$(id -u):\$(id -g)\" -w \"/repo\" --rm -it --ulimit nofile=1024 -v \"\$(pwd):/repo\" \"jorisroovers/gitlint\"' ;" ; \
-    echo "alias reveal-md='docker run --rm  -u \"\$(id -u):\$(id -g)\" -p \"1948:1948\" -p \"35729:35729\" -v \"\$(pwd):/slides\" \"webpronl/reveal-md:latest\" /slides --watch' ;" ; \
+  echo "alias docker-run='docker run --rm -it -v \"\${PWD}:/workspace\"' ;" ; \
+  echo "alias docker-run-u='docker-run --user \"\$(id -u):\$(id -g)\"' ;" ; \
+  echo "alias ubuntu-c='docker-run -w \"/workspace\" ubuntu:hirsute' ;" ; \
+  echo "alias debian-c='docker-run -w \"/workspace\" debian:bullseye' ;" ; \
+  echo "alias alpine-c='docker-run -w \"/workspace\" alpine:edge' ;" ; \
+  echo "alias pureos-c='docker-run -w \"/workspace\" pureos/pureos:byzantium-slim' ;" ; \
+  echo "alias arch-c='docker-run -w \"/workspace\" archlinux bash -c \"pacman-key --init && pacman-key --populate \"archlinux\" && exec bash --login\"' ;" ; \
+  echo "alias gitlint='docker run -u \"\$(id -u):\$(id -g)\" -w \"/repo\" --rm -it --ulimit nofile=1024 -v \"\$(pwd):/repo\" \"jorisroovers/gitlint\"' ;" ; \
+  echo "alias gitleaks='docker run -u \"\$(id -u):\$(id -g)\" -v \"\$(pwd):/path\" -w \"/path\" --rm -it \"zricethezav/gitleaks:latest\"' ;" ; \
+  echo "alias code-server='docker-run --network host -d -u \"\$(id -u):\$(id -g)\" \"codercom/code-server:latest\" --auth none' ;" ; \
+  echo "alias rmcontainers='docker ps -aq | xargs -r docker rm -f' ;" ; \
+  echo "alias gitlint='docker run -u \"\$(id -u):\$(id -g)\" -w \"/repo\" --rm -it --ulimit nofile=1024 -v \"\$(pwd):/repo\" \"jorisroovers/gitlint\"' ;" ; \
+  echo "alias reveal-md='docker run --rm  -u \"\$(id -u):\$(id -g)\" -p \"1948:1948\" -p \"35729:35729\" -v \"\$(pwd):/slides\" \"webpronl/reveal-md:latest\" /slides --watch' ;" ; \
   ) | tee "/etc/profile.d/docker.sh" > /dev/null || exit 1 ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                      useful dev cli tools                │
@@ -248,55 +248,55 @@ RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   pacman --quiet -S --noconfirm --needed \
-    "chaotic-aur/powershell-bin" \
-    "go" \
-    "lua" \
-    "luajit" \
-    "luarocks" \
-    "python" \
-    "python-pip" \
-    "python-setuptools" \
-    "ruby" \
-    "nodejs" \
-    "npm" \
-    "yarn" \
-    "starship" \
-    "fzf" \
-    "github-cli" \
-    "git-delta" \
-    "difftastic" \
-    "zellij" \
-    "zoxide" \
-    "xplr" \
-    "ripgrep" \
-    "eza" \
-    "atuin" \
-    "bash-preexec" \
-    "bat" \
-    "just" \
-    "make" \
-    "go-task" ; \
+  "chaotic-aur/powershell-bin" \
+  "go" \
+  "lua" \
+  "luajit" \
+  "luarocks" \
+  "python" \
+  "python-pip" \
+  "python-setuptools" \
+  "ruby" \
+  "nodejs" \
+  "npm" \
+  "yarn" \
+  "starship" \
+  "fzf" \
+  "github-cli" \
+  "git-delta" \
+  "difftastic" \
+  "zellij" \
+  "zoxide" \
+  "xplr" \
+  "ripgrep" \
+  "eza" \
+  "atuin" \
+  "bash-preexec" \
+  "bat" \
+  "just" \
+  "make" \
+  "go-task" ; \
   #  ╭──────────────────────────────────────────────────────────╮
   #  │                     go setup                             │
   #  ╰──────────────────────────────────────────────────────────╯
   go version > /dev/null 2>&1 && ( \
-    echo 'export PATH="${PATH}:$(go env GOPATH)/bin";' ; \
+  echo 'export PATH="${PATH}:$(go env GOPATH)/bin";' ; \
   ) | tee "/etc/profile.d/go.sh" > /dev/null || exit 1 ; \
   #  ╭──────────────────────────────────────────────────────────╮
   #  │                     ruby setup                           │
   #  ╰──────────────────────────────────────────────────────────╯
   gem --version > /dev/null 2>&1 && ( \
-    echo 'export GEM_HOME="$(ruby -e "puts Gem.user_dir")";' ; \
-    echo 'export PATH="${PATH}:${GEM_HOME}/bin";' ; \
+  echo 'export GEM_HOME="$(ruby -e "puts Gem.user_dir")";' ; \
+  echo 'export PATH="${PATH}:${GEM_HOME}/bin";' ; \
   ) | tee "/etc/profile.d/ruby.sh" > /dev/null || exit 1 ; \
   #  ╭──────────────────────────────────────────────────────────╮
   #  │                     python setup                         │
-  #  ╰──────────────────────────────────────────────────────────╯  
+  #  ╰──────────────────────────────────────────────────────────╯
   sudo -i -u "${USER}" \
-    bash -c 'curl -sSL https://install.python-poetry.org | python3 -' > /dev/null 2>&1 \
+  bash -c 'curl -sSL https://install.python-poetry.org | python3 -' > /dev/null 2>&1 \
   && ln -sf "${HOME}/.local/bin/poetry" "/usr/local/bin/poetry" \
   && poetry --version > /dev/null 2>&1 && ( \
-    echo 'eval "$(poetry completions bash)" ;' ; \
+  echo 'eval "$(poetry completions bash)" ;' ; \
   ) | tee "/etc/profile.d/poetry.sh" > /dev/null || exit 1 ; \
   #  ╭──────────────────────────────────────────────────────────╮
   #  │                 nodejs setup                             │
@@ -307,101 +307,101 @@ RUN \
   #  │                 powershell init                          │
   #  ╰──────────────────────────────────────────────────────────╯
   pwsh --version && ( \
-      pwsh -c ' \
-      $parent=Split-Path -parent $PROFILE ; if (-not(Test-Path -Path $parent -PathType Container)) {$null = New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop} \
-      ' ; \
-    ) || exit 0 ; \
+  pwsh -c ' \
+  $parent=Split-Path -parent $PROFILE ; if (-not(Test-Path -Path $parent -PathType Container)) {$null = New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop} \
+  ' ; \
+  ) || exit 0 ; \
   ) ; \
   # ─── USE DELTA FOR GIT DIFFS ────────────────────────────────────────────────────
   delta --version > /dev/null 2>&1 && ( \
-    git config --system pager.diff delta \
-    && git config --system pager.log delta \
-    && git config --system pager.reflog delta \
-    && git config --system pager.show delta \
-    && git config --system interactive.difffilter "delta --color-only --features=interactive" \
-    && git config --system delta.features "side-by-side line-numbers decorations" \
-    && git config --system delta.whitespace-error-style "22 reverse" \
-    && git config --system delta.decorations.commit-decoration-style "bold yellow box ul" \
-    && git config --system delta.decorations.file-style "bold yellow ul" \
-    && git config --system delta.decorations.file-decoration-style "none" \
-    && git config --system delta.decorations.commit-style "raw" \
-    && git config --system delta.decorations.hunk-header-decoration-style "blue box" \
-    && git config --system delta.decorations.hunk-header-file-style "red" \
-    && git config --system delta.decorations.hunk-header-line-number-style "#067a00" \
-    && git config --system delta.decorations.hunk-header-style "file line-number syntax" \
-    && git config --system delta.interactive.keep-plus-minus-markers "false" \
+  git config --system pager.diff delta \
+  && git config --system pager.log delta \
+  && git config --system pager.reflog delta \
+  && git config --system pager.show delta \
+  && git config --system interactive.difffilter "delta --color-only --features=interactive" \
+  && git config --system delta.features "side-by-side line-numbers decorations" \
+  && git config --system delta.whitespace-error-style "22 reverse" \
+  && git config --system delta.decorations.commit-decoration-style "bold yellow box ul" \
+  && git config --system delta.decorations.file-style "bold yellow ul" \
+  && git config --system delta.decorations.file-decoration-style "none" \
+  && git config --system delta.decorations.commit-style "raw" \
+  && git config --system delta.decorations.hunk-header-decoration-style "blue box" \
+  && git config --system delta.decorations.hunk-header-file-style "red" \
+  && git config --system delta.decorations.hunk-header-line-number-style "#067a00" \
+  && git config --system delta.decorations.hunk-header-style "file line-number syntax" \
+  && git config --system delta.interactive.keep-plus-minus-markers "false" \
   ) || exit 1 ; \
   go-task --version > /dev/null 2>&1 && ( \
-    ln -sf "$(which "go-task" 2>/dev/null)" "/usr/local/bin/task" ; \
+  ln -sf "$(which "go-task" 2>/dev/null)" "/usr/local/bin/task" ; \
   ) || exit 1 ; \
   starship --version > /dev/null 2>&1 && echo 'eval "$(starship init bash)" ;' > "/etc/profile.d/starship.sh" || exit 1 ; \
   just --version > /dev/null 2>&1 && ( \
-    echo 'eval "$(just --completions bash)" ;' > "/etc/profile.d/just.sh" ; \
+  echo 'eval "$(just --completions bash)" ;' > "/etc/profile.d/just.sh" ; \
   ) || exit 1 ; \
   zoxide --version && ( \
-    ( \
-      echo 'export _ZO_DATA_DIR="/workspace/zoxide" ; ' ; \
-      echo '[ ! -d "${_ZO_DATA_DIR}" ] && mkdir "${_ZO_DATA_DIR}" ;' ; \
-      echo 'eval "$(zoxide init bash)" ;' ; \
-      echo 'alias cd="z"' ; \
-    ) | tee "/etc/profile.d/zoxide.sh" > /dev/null || exit 1 ; \
+  ( \
+  echo 'export _ZO_DATA_DIR="/workspace/zoxide" ; ' ; \
+  echo '[ ! -d "${_ZO_DATA_DIR}" ] && mkdir "${_ZO_DATA_DIR}" ;' ; \
+  echo 'eval "$(zoxide init bash)" ;' ; \
+  echo 'alias cd="z"' ; \
+  ) | tee "/etc/profile.d/zoxide.sh" > /dev/null || exit 1 ; \
   ) || exit 1 ; \
   bat --version > /dev/null 2>&1 && ( \
-    echo 'alias cat="bat -pp" ;' ; \
-    echo "export MANPAGER='sh -c \"col -bx | bat --language man --style plain\"' ;" ; \
+  echo 'alias cat="bat -pp" ;' ; \
+  echo "export MANPAGER='sh -c \"col -bx | bat --language man --style plain\"' ;" ; \
   ) | tee "/etc/profile.d/bat.sh" > /dev/null || exit 1  ; \
   eza --version > /dev/null 2>&1 && ( \
-    echo 'alias la="eza -alhF" ;' ; \
-    echo 'alias ll="eza -lhF" ;' ; \
-    echo 'alias llfu="eza -bghHliS --git" ;' ; \
-    echo 'alias llt="eza -T" ;' ; \
-    echo 'alias ls="eza" ;' ; \
+  echo 'alias la="eza -alhF" ;' ; \
+  echo 'alias ll="eza -lhF" ;' ; \
+  echo 'alias llfu="eza -bghHliS --git" ;' ; \
+  echo 'alias llt="eza -T" ;' ; \
+  echo 'alias ls="eza" ;' ; \
   ) | tee "/etc/profile.d/eza.sh" > /dev/null || exit 1 ; \
   gh --version > /dev/null 2>&1 && ( \
-    echo 'eval "$(gh completion -s bash)" ;' > "/etc/profile.d/gh.sh" ; \
-    pwsh --version && ( \
-      pwsh -c ' \
-      "Invoke-Expression -Command $(gh completion -s powershell | Out-String)" \
-      | Out-File -Append -Encoding ascii "$PROFILE" \
-      ' ; \
-    ) || exit 0 ; \
+  echo 'eval "$(gh completion -s bash)" ;' > "/etc/profile.d/gh.sh" ; \
+  pwsh --version && ( \
+  pwsh -c ' \
+  "Invoke-Expression -Command $(gh completion -s powershell | Out-String)" \
+  | Out-File -Append -Encoding ascii "$PROFILE" \
+  ' ; \
+  ) || exit 0 ; \
   ) || exit 1 ; \
   atuin --version > /dev/null 2>&1 && ( \
-    echo '[ ! -d "${HOME}/.config/atuin" ] && mkdir "${HOME}/.config/atuin" ;' ; \
-    echo 'wget -qO "${HOME}/.config/atuin/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/atuin/config.toml" ;' ; \
-    echo 'sed -i "/db_path/d" "${HOME}/.config/atuin/config.toml"' ; \
-    echo "echo 'db_path = \"${WORKDIR}/.history.db\"' >> '${HOME}/.config/atuin/config.toml' ;" ; \
-    echo '[[ -r "/usr/share/bash-preexec/bash-preexec.sh" ]] && source "/usr/share/bash-preexec/bash-preexec.sh"' ; \
-    echo 'eval "$(atuin init bash)" ;' ; \
+  echo '[ ! -d "${HOME}/.config/atuin" ] && mkdir "${HOME}/.config/atuin" ;' ; \
+  echo 'wget -qO "${HOME}/.config/atuin/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/atuin/config.toml" ;' ; \
+  echo 'sed -i "/db_path/d" "${HOME}/.config/atuin/config.toml"' ; \
+  echo "echo 'db_path = \"${WORKDIR}/.history.db\"' >> '${HOME}/.config/atuin/config.toml' ;" ; \
+  echo '[[ -r "/usr/share/bash-preexec/bash-preexec.sh" ]] && source "/usr/share/bash-preexec/bash-preexec.sh"' ; \
+  echo 'eval "$(atuin init bash)" ;' ; \
   ) | tee "/etc/profile.d/atuin.sh" > /dev/null || exit 1 ; \
   xplr --version > /dev/null 2>&1 && ( \
-    echo '[ ! -d "${HOME}/.config/xplr" ] && mkdir -p "${HOME}/.config/xplr" ;' ; \
-    echo 'wget -qO "${HOME}/.config/xplr/init.lua" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/xplr/init.lua" ;' ; \
+  echo '[ ! -d "${HOME}/.config/xplr" ] && mkdir -p "${HOME}/.config/xplr" ;' ; \
+  echo 'wget -qO "${HOME}/.config/xplr/init.lua" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/xplr/init.lua" ;' ; \
   ) | tee "/etc/profile.d/xplr.sh" > /dev/null  || exit 1 ; \
   fzf --version > /dev/null 2>&1 && ( \
-    echo '_fzf_complete_make() {' ; \
-    echo '  FZF_COMPLETION_TRIGGER="" _fzf_complete "-1" "${@}" < <(make -pqr 2>/dev/null \' ; \
-    echo '  | awk -F":" "/^[a-zA-Z0-9][^\$#\/\t=]*:([^=]|\$)/ {split(\$1,A,/ /);for(i in A)print A[i]}" \' ; \
-    echo '  | grep -v Makefile \' ; \
-    echo '  | sort -u)' ; \
-    echo '}' ; \
-    echo '[[ -n ${BASH} ]] && complete -F _fzf_complete_make -o default -o bashdefault make' ; \
-    echo '[ -r "/usr/share/fzf/key-bindings.bash" ] && source "/usr/share/fzf/key-bindings.bash"' ; \
-    echo '[ -r "/usr/share/fzf/completion.bash" ] && source "/usr/share/fzf/completion.bash"' ; \
+  echo '_fzf_complete_make() {' ; \
+  echo '  FZF_COMPLETION_TRIGGER="" _fzf_complete "-1" "${@}" < <(make -pqr 2>/dev/null \' ; \
+  echo '  | awk -F":" "/^[a-zA-Z0-9][^\$#\/\t=]*:([^=]|\$)/ {split(\$1,A,/ /);for(i in A)print A[i]}" \' ; \
+  echo '  | grep -v Makefile \' ; \
+  echo '  | sort -u)' ; \
+  echo '}' ; \
+  echo '[[ -n ${BASH} ]] && complete -F _fzf_complete_make -o default -o bashdefault make' ; \
+  echo '[ -r "/usr/share/fzf/key-bindings.bash" ] && source "/usr/share/fzf/key-bindings.bash"' ; \
+  echo '[ -r "/usr/share/fzf/completion.bash" ] && source "/usr/share/fzf/completion.bash"' ; \
   ) | tee "/etc/profile.d/fzf.sh" > /dev/null || exit 1 ; \
   ( \
-    echo 'if hx --version > /dev/null 2>&1 ; then' ;\
-    echo '  export EDITOR="hx" ;' ;\
-    echo '  export VISUAL="hx" ;' ;\
-    echo '  [ ! -d "${HOME}/.config/helix" ] && mkdir "${HOME}/.config/helix" ;' ; \
-    echo '  wget -qO "${HOME}/.config/helix/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/helix/config.toml" ;' ; \
-    echo 'fi' ;\
+  echo 'if hx --version > /dev/null 2>&1 ; then' ;\
+  echo '  export EDITOR="hx" ;' ;\
+  echo '  export VISUAL="hx" ;' ;\
+  echo '  [ ! -d "${HOME}/.config/helix" ] && mkdir "${HOME}/.config/helix" ;' ; \
+  echo '  wget -qO "${HOME}/.config/helix/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/helix/config.toml" ;' ; \
+  echo 'fi' ;\
   ) | tee "/etc/profile.d/editor.sh" > /dev/null || exit 1 ; \
   ( \
-    # ensures shell always has the latest gipod variables
-    echo 'if gp version > /dev/null 2>&1 ; then' ;\
-    echo '  eval "$(gp env --export)" ;' ;\
-    echo 'fi' ;\
+  # ensures shell always has the latest gipod variables
+  echo 'if gp version > /dev/null 2>&1 ; then' ;\
+  echo '  eval "$(gp env --export)" ;' ;\
+  echo 'fi' ;\
   ) | tee "/etc/profile.d/gitpod.sh" > /dev/null || exit 1 ; \
   compress-packages ;
 USER "${USER}"
@@ -424,36 +424,36 @@ RUN \
   && pacman --quiet --noprogressbar -S --noconfirm --needed "rustup" "cargo-binstall" ; \
   # https://stackoverflow.com/questions/28227739/lock-a-file-in-bash-using-flock-and-lockfile
   rustup --version > /dev/null 2>&1 && ( \
-    echo '(' ; \
-    echo '  flock -x -n 3 || exit 55 ;' ; \
-    echo '  ! ( rustup toolchain list | grep -q "nightly" ) && rustup toolchain install nightly ;' ; \
-    echo ') 3> "/tmp/rust-nightly.lock"' ; \
-    echo '(' ; \
-    echo '  flock -x -n 4 || exit 55 ;' ; \
-    echo '  ! ( rustup toolchain list | grep -q "stable" ) && (rustup toolchain install stable && rustup default stable );' ; \
-    echo ') 4> "/tmp/rust-stable.lock"' ; \
-    echo '{' ; \
-    echo '  flock -s 3 ;' ; \
-    echo '  flock -u 3 ;' ; \
-    echo '} 3<"/tmp/rust-nightly.lock" ;' ; \
-    echo '{' ; \
-    echo '  flock -s 4 ;' ; \
-    echo '  flock -u 4 ;' ; \
-    echo '} 4<"/tmp/rust-stable.lock"' ; \
-    echo '[ -r "/tmp/rust-nightly.lock" ] && rm "/tmp/rust-nightly.lock" ;' ; \
-    echo '[ -r "/tmp/rust-stable.lock" ] && rm "/tmp/rust-stable.lock" ;' ; \
-    echo 'export RUSTUP_HOME="${HOME}/.rustup";' ; \
-    echo 'export CARGO_HOME="${HOME}/.cargo";' ; \
-    echo 'export PATH="${PATH}:${CARGO_HOME}/bin";' ; \
+  echo '(' ; \
+  echo '  flock -x -n 3 || exit 55 ;' ; \
+  echo '  ! ( rustup toolchain list | grep -q "nightly" ) && rustup toolchain install nightly ;' ; \
+  echo ') 3> "/tmp/rust-nightly.lock"' ; \
+  echo '(' ; \
+  echo '  flock -x -n 4 || exit 55 ;' ; \
+  echo '  ! ( rustup toolchain list | grep -q "stable" ) && (rustup toolchain install stable && rustup default stable );' ; \
+  echo ') 4> "/tmp/rust-stable.lock"' ; \
+  echo '{' ; \
+  echo '  flock -s 3 ;' ; \
+  echo '  flock -u 3 ;' ; \
+  echo '} 3<"/tmp/rust-nightly.lock" ;' ; \
+  echo '{' ; \
+  echo '  flock -s 4 ;' ; \
+  echo '  flock -u 4 ;' ; \
+  echo '} 4<"/tmp/rust-stable.lock"' ; \
+  echo '[ -r "/tmp/rust-nightly.lock" ] && rm "/tmp/rust-nightly.lock" ;' ; \
+  echo '[ -r "/tmp/rust-stable.lock" ] && rm "/tmp/rust-stable.lock" ;' ; \
+  echo 'export RUSTUP_HOME="${HOME}/.rustup";' ; \
+  echo 'export CARGO_HOME="${HOME}/.cargo";' ; \
+  echo 'export PATH="${PATH}:${CARGO_HOME}/bin";' ; \
   ) | tee -a "/etc/profile.d/00-rust.sh" > /dev/null \
   rustup toolchain install "stable" \
   && cargo install --locked --git "https://hg.sr.ht/~cyplo/legdur" \
   && cargo install --locked --git "https://github.com/flatt-security/shisho.git" \
   && cargo binstall --quiet --no-confirm \
-    "cargo-cache" \
-    "smartcat" \
-    "aichat" \
-    "prose" \
+  "cargo-cache" \
+  "smartcat" \
+  "aichat" \
+  "prose" \
   && cargo-cache --remove-dir "all" > /dev/null 2>&1 \
   && rustup toolchain list | cut -d' ' -f1 | xargs -r -I {} rustup --quiet toolchain uninstall {} ; \
   # For fixing the following error:
@@ -461,14 +461,14 @@ RUN \
   # ❯ sudo su -
   # -bash: /etc/bash_completion.d/cargo: No such file or directory
   [ -d "/usr/share/bash-completion/completions" ] && ( \
-    [ ! -r "/usr/share/bash-completion/completions/cargo" ]  \
-      && rustup completions bash cargo > "/usr/share/bash-completion/completions/cargo" || exit 0 ; \
-    [ ! -r "/usr/share/bash-completion/completions/rustup" ]  \
-      && rustup completions bash rustup > "/usr/share/bash-completion/completions/rustup" || exit 0 ; \
+  [ ! -r "/usr/share/bash-completion/completions/cargo" ]  \
+  && rustup completions bash cargo > "/usr/share/bash-completion/completions/cargo" || exit 0 ; \
+  [ ! -r "/usr/share/bash-completion/completions/rustup" ]  \
+  && rustup completions bash rustup > "/usr/share/bash-completion/completions/rustup" || exit 0 ; \
   ) || exit 0 \
   compress-packages ; \
   while read BIN ; do \
-    upx "$(which "${BIN}")" ; \
+  upx "$(which "${BIN}")" ; \
   done ; < <(cat "${CARGO_HOME}/.crates2.json"  | jq -r ".installs | to_entries[].value.bins[]" | sort -u)
 RUN du --human-readable --max-depth 1 "${HOME}" > /.rustup
 #  ╭──────────────────────────────────────────────────────────╮
@@ -485,15 +485,15 @@ USER "root"
 # hadolint ignore=SC2016
 RUN \
   npm install --silent -g \
-    "github-label-sync" \
-    "remark" \
-    "remark-cli" \
-    "remark-frontmatter" \
-    "remark-stringify" \
-    "remark-toc" \
-    "remark-preset-lint-recommended" \
-    "remark-lint-list-item-indent" \
-    "remark-reference-links" \
+  "github-label-sync" \
+  "remark" \
+  "remark-cli" \
+  "remark-frontmatter" \
+  "remark-stringify" \
+  "remark-toc" \
+  "remark-preset-lint-recommended" \
+  "remark-lint-list-item-indent" \
+  "remark-reference-links" \
   && npm cache clean --quiet --force \
   && compress-packages ;
 #  ╭──────────────────────────────────────────────────────────╮
@@ -509,63 +509,63 @@ RUN \
 #
 # hadolint ignore=DL3004,SC2016,DL3047
 RUN \
-! wget --version > /dev/null 2>&1 && { echo "*** "wget" not found"; exit 1; } ; \
-! jq --version > /dev/null 2>&1 && { echo "*** "jq" not found"; exit 1; } ; \
-! sudo --version > /dev/null 2>&1 && { echo "*** "sudo" not found"; exit 1; } ; \
-! xz --version > /dev/null 2>&1 && { echo "*** "xz" not found"; exit 1; } ; \
-! tar --version > /dev/null 2>&1 && { echo "*** "tar" not found"; exit 1; } ; \
-! xargs --version > /dev/null 2>&1 && { echo "*** "xargs" not found"; exit 1; } ; \
-dir="$(mktemp -d)" ; \
-architecture="x86_64" ; \
-wget -qO - "https://api.github.com/repos/helix-editor/helix/releases/latest" \
-| jq -r "\
-.assets[]|select(\
-.browser_download_url \
-| (\
-contains(\"${architecture}\") \
-and contains(\"linux\") \
-and contains(\"tar\") \
-and (contains(\"sha256\") | not) \
-)).browser_download_url" \
+  ! wget --version > /dev/null 2>&1 && { echo "*** "wget" not found"; exit 1; } ; \
+  ! jq --version > /dev/null 2>&1 && { echo "*** "jq" not found"; exit 1; } ; \
+  ! sudo --version > /dev/null 2>&1 && { echo "*** "sudo" not found"; exit 1; } ; \
+  ! xz --version > /dev/null 2>&1 && { echo "*** "xz" not found"; exit 1; } ; \
+  ! tar --version > /dev/null 2>&1 && { echo "*** "tar" not found"; exit 1; } ; \
+  ! xargs --version > /dev/null 2>&1 && { echo "*** "xargs" not found"; exit 1; } ; \
+  dir="$(mktemp -d)" ; \
+  architecture="x86_64" ; \
+  wget -qO - "https://api.github.com/repos/helix-editor/helix/releases/latest" \
+  | jq -r "\
+  .assets[]|select(\
+  .browser_download_url \
+  | (\
+  contains(\"${architecture}\") \
+  and contains(\"linux\") \
+  and contains(\"tar\") \
+  and (contains(\"sha256\") | not) \
+  )).browser_download_url" \
   | xargs -r -I {} wget -O - {} 2> /dev/null \
   | xz -d -c  \
   | tar -xv -C "${dir}" --strip-components=1 > /dev/null 2>&1 ; \
-chmod +x "${dir}/hx" ; \
-[ ! -d "${HOME}/.local/bin" ] && mkdir -p "${HOME}/.local/bin" ; \
-mv -f "${dir}/hx" "${HOME}/.local/bin/hx" ; \
-[ -d "${HOME}/.config/helix/runtime" ] && rm -r "${HOME}/.config/helix/runtime" ; \
-mkdir -p "${HOME}/.config/helix" \
-&& mv "${dir}/runtime" "${HOME}/.config/helix/runtime" \
-&& ln -sf "${HOME}/.local/bin/hx" "/usr/local/bin/hx" \
-&& rm -r "${dir}" \
-&& chown -R "$(id -u "${USER}"):$(id -g "${USER}")" \
+  chmod +x "${dir}/hx" ; \
+  [ ! -d "${HOME}/.local/bin" ] && mkdir -p "${HOME}/.local/bin" ; \
+  mv -f "${dir}/hx" "${HOME}/.local/bin/hx" ; \
+  [ -d "${HOME}/.config/helix/runtime" ] && rm -r "${HOME}/.config/helix/runtime" ; \
+  mkdir -p "${HOME}/.config/helix" \
+  && mv "${dir}/runtime" "${HOME}/.config/helix/runtime" \
+  && ln -sf "${HOME}/.local/bin/hx" "/usr/local/bin/hx" \
+  && rm -r "${dir}" \
+  && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" \
   "${HOME}/.local/bin" \
   "${HOME}/.config/helix" \
-&& hx --version > /dev/null 2>&1 && ( \
+  && hx --version > /dev/null 2>&1 && ( \
   [ ! -d "${HOME}/.init.d/" ] && ( mkdir "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
   ( \
-    echo '#!/usr/bin/env bash' ; \
-    echo 'if [ ! -d "${HOME}/.config/helix/runtime/grammars/sources" ]; then' ; \
-    echo '  self="$(realpath -s "${BASH_SOURCE[0]}")";' ; \
-    echo '  lockfile="/tmp/$(basename -s.sh "${self}").lock" ;' ; \
-    echo '  (' ; \
-    echo '    flock -x -n 20 || exit 55 ;' ; \
-    echo '    wget -qO "${HOME}/.config/helix/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/helix/config.toml"' ; \
-    echo '    # hx --grammar fetch' ; \
-    echo '    # hx --grammar build' ; \
-    echo '  ) 20> "${lockfile}"' ; \
-    echo '  {' ; \
-    echo '    flock -s 20 ;' ; \
-    echo '    echo "[ $(basename -s.sh "${self}") ] : cleaning up self..." ;' ; \
-    echo '    flock -u 20 ;' ; \
-    echo '    rm "${self}" ;' ; \
-    echo '  } 20<"${lockfile}"' ; \
-    echo '  [ -r "${lockfile}" ] && rm "${lockfile}" ;' ; \
-    echo 'fi' ; \
+  echo '#!/usr/bin/env bash' ; \
+  echo 'if [ ! -d "${HOME}/.config/helix/runtime/grammars/sources" ]; then' ; \
+  echo '  self="$(realpath -s "${BASH_SOURCE[0]}")";' ; \
+  echo '  lockfile="/tmp/$(basename -s.sh "${self}").lock" ;' ; \
+  echo '  (' ; \
+  echo '    flock -x -n 20 || exit 55 ;' ; \
+  echo '    wget -qO "${HOME}/.config/helix/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/helix/config.toml"' ; \
+  echo '    # hx --grammar fetch' ; \
+  echo '    # hx --grammar build' ; \
+  echo '  ) 20> "${lockfile}"' ; \
+  echo '  {' ; \
+  echo '    flock -s 20 ;' ; \
+  echo '    echo "[ $(basename -s.sh "${self}") ] : cleaning up self..." ;' ; \
+  echo '    flock -u 20 ;' ; \
+  echo '    rm "${self}" ;' ; \
+  echo '  } 20<"${lockfile}"' ; \
+  echo '  [ -r "${lockfile}" ] && rm "${lockfile}" ;' ; \
+  echo 'fi' ; \
   ) | tee "${HOME}/.init.d/helix.sh" > /dev/null \
   && chmod +x "${HOME}/.init.d/helix.sh" \
   && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/helix.sh" \
-) || exit 1
+  ) || exit 1
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                  infrustructure as code                  │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -578,16 +578,16 @@ RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   pacman --quiet -S --noconfirm --needed "helm" "kustomize" "kube-linter" "kubectl" ; \
   kubectl version --client=true > /dev/null 2>&1 && ( \
-    echo 'eval "$(kubectl completion bash)" ;' ; \
+  echo 'eval "$(kubectl completion bash)" ;' ; \
   ) | tee -a "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ; \
   helm version > /dev/null 2>&1 && ( \
-    echo 'eval "$(helm completion bash)" ;' ; \
+  echo 'eval "$(helm completion bash)" ;' ; \
   ) | tee -a "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ; \
   kustomize version > /dev/null 2>&1 && ( \
-    echo 'eval "$(kustomize completion bash)" ;' ; \
+  echo 'eval "$(kustomize completion bash)" ;' ; \
   ) | tee -a "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ; \
   kube-linter version > /dev/null 2>&1 && ( \
-    echo 'eval "$(kube-linter completion bash)" ;' ; \
+  echo 'eval "$(kube-linter completion bash)" ;' ; \
   ) | tee -a "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ; \
   compress-packages ;
 # hashicorp
@@ -604,84 +604,84 @@ RUN \
   "https://aur.archlinux.org/terraform-docs-bin.git" \
   ) ; \
   GROUPS_ARR=( \
-    "tfenv" \
-    "consul" \
-    "vault" \
+  "tfenv" \
+  "consul" \
+  "vault" \
   ) ; \
   pacman --quiet --noprogressbar -S --noconfirm --needed "consul" "vault" ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
-    && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
-    && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
-    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noprogressbar --nocheck --skipinteg --noconfirm && break || sleep 15; done \
-    && popd > /dev/null 2>&1 || exit 1 ; \
-    rm -r "/tmp/"$(basename "${url%.git}")"" ; \
-    go clean -modcache > /dev/null 2>&1 ; \
-    su-exec "${USER}" go clean -modcache > /dev/null 2>&1 ; \
-    go clean -cache > /dev/null 2>&1 ; \
-    su-exec "${USER}" go clean -cache > /dev/null 2>&1 ; \
+  git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
+  && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
+  && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
+  for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noprogressbar --nocheck --skipinteg --noconfirm && break || sleep 15; done \
+  && popd > /dev/null 2>&1 || exit 1 ; \
+  rm -r "/tmp/"$(basename "${url%.git}")"" ; \
+  go clean -modcache > /dev/null 2>&1 ; \
+  su-exec "${USER}" go clean -modcache > /dev/null 2>&1 ; \
+  go clean -cache > /dev/null 2>&1 ; \
+  su-exec "${USER}" go clean -cache > /dev/null 2>&1 ; \
   done ; \
   rm -rf "${HOME}/go/pkg/mod" ; \
   for group in "${GROUPS_ARR[@]}";do \
-    getent group "${group}" > /dev/null 2>&1 && usermod -aG "${group}" "${USER}" || continue ; \
+  getent group "${group}" > /dev/null 2>&1 && usermod -aG "${group}" "${USER}" || continue ; \
   done ; \
   # https://jdimpson.livejournal.com/5685.html
   # https://stackoverflow.com/questions/8295908/how-to-use-a-variable-to-indicate-a-file-descriptor-in-bash
   tflint --version > /dev/null 2>&1 && ( \
-    [ ! -d "${HOME}/.init.d/" ] && ( mkdir "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
-    ( \
-      echo '#!/usr/bin/env bash' ; \
-      echo 'self="$(realpath -s "${BASH_SOURCE[0]}")";' ; \
-      echo '  TFLINT_PLUGINS=(' ; \
-      echo '  "tflint-ruleset-opa"' ; \
-      echo '  "tflint-ruleset-aws"' ; \
-      echo '  "tflint-ruleset-azurerm"' ; \
-      echo '  "tflint-ruleset-google"' ; \
-      echo ') ;' ; \
-      echo 'architecture="amd64" ;' ; \
-      echo '[ ! -d "${HOME}/.tflint.d/plugins" ] && mkdir -p "${HOME}/.tflint.d/plugins" ;' ; \
-      echo 'for index in "${!TFLINT_PLUGINS[@]}"; do' ; \
-      echo '  plugin="${TFLINT_PLUGINS[$index]}" ;' ; \
-      echo '  if [ ! -r "${HOME}/.tflint.d/plugins/${plugin}" ];then' ; \
-      echo '    lockfile="/tmp/${plugin}.lock" ;' ; \
-      echo '    fd="$((0x$(echo "${plugin}" | md5sum | cut -f 1 -d " " | cut -c 1-2)))" ;' ; \
-      echo '    exec {fd}<>"${lockfile}"' ; \
-      echo '    echo "*** Installing ${plugin} ..."' ; \
-      echo '    (' ; \
-      echo '      flock -x -n "${fd}" || exit 55 ;' ; \
-      echo '      url="https://api.github.com/repos/terraform-linters/${plugin}/releases/latest" ;' ; \
-      echo '      wget -qO - "${url}" \' ; \
-      echo '      | jq -r "\' ; \
-      echo '      .assets[]|select(\' ; \
-      echo '      .browser_download_url \' ; \
-      echo '      | (\' ; \
-      echo '      contains(\"${architecture}\") \' ; \
-      echo '      and contains(\"linux\") \' ; \
-      echo '      and (contains(\"sha256\") | not) \' ; \
-      echo '      )).browser_download_url" \' ; \
-      echo '      | xargs -r -I {} wget -qO - {} 2> /dev/null \' ; \
-      echo '      | bsdtar -xvf- -C "${HOME}/.tflint.d/plugins" > /dev/null 2>&1 ;' ; \
-      echo '    ) >&${fd}' ; \
-      echo '    {' ; \
-      echo '      flock -s "${fd}" ;' ; \
-      echo '      echo "*** ${plugin} installed "' ; \
-      echo '      chmod +x "${HOME}/.tflint.d/plugins/${plugin}" ;' ; \
-      echo '      flock -u "${fd}" ;' ; \
-      echo '    } <&${fd}' ; \
-      echo '    [ -r "${lockfile}" ] && rm "${lockfile}" ;' ; \
-      echo '  fi' ; \
-      echo 'done ;' ; \
-      echo 'rm "${self}" ;' ; \
-    ) | tee "${HOME}/.init.d/tflint.sh" > /dev/null \
-    && chmod +x "${HOME}/.init.d/tflint.sh" \
-    && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/tflint.sh"  ; \
+  [ ! -d "${HOME}/.init.d/" ] && ( mkdir "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
+  ( \
+  echo '#!/usr/bin/env bash' ; \
+  echo 'self="$(realpath -s "${BASH_SOURCE[0]}")";' ; \
+  echo '  TFLINT_PLUGINS=(' ; \
+  echo '  "tflint-ruleset-opa"' ; \
+  echo '  "tflint-ruleset-aws"' ; \
+  echo '  "tflint-ruleset-azurerm"' ; \
+  echo '  "tflint-ruleset-google"' ; \
+  echo ') ;' ; \
+  echo 'architecture="amd64" ;' ; \
+  echo '[ ! -d "${HOME}/.tflint.d/plugins" ] && mkdir -p "${HOME}/.tflint.d/plugins" ;' ; \
+  echo 'for index in "${!TFLINT_PLUGINS[@]}"; do' ; \
+  echo '  plugin="${TFLINT_PLUGINS[$index]}" ;' ; \
+  echo '  if [ ! -r "${HOME}/.tflint.d/plugins/${plugin}" ];then' ; \
+  echo '    lockfile="/tmp/${plugin}.lock" ;' ; \
+  echo '    fd="$((0x$(echo "${plugin}" | md5sum | cut -f 1 -d " " | cut -c 1-2)))" ;' ; \
+  echo '    exec {fd}<>"${lockfile}"' ; \
+  echo '    echo "*** Installing ${plugin} ..."' ; \
+  echo '    (' ; \
+  echo '      flock -x -n "${fd}" || exit 55 ;' ; \
+  echo '      url="https://api.github.com/repos/terraform-linters/${plugin}/releases/latest" ;' ; \
+  echo '      wget -qO - "${url}" \' ; \
+  echo '      | jq -r "\' ; \
+  echo '      .assets[]|select(\' ; \
+  echo '      .browser_download_url \' ; \
+  echo '      | (\' ; \
+  echo '      contains(\"${architecture}\") \' ; \
+  echo '      and contains(\"linux\") \' ; \
+  echo '      and (contains(\"sha256\") | not) \' ; \
+  echo '      )).browser_download_url" \' ; \
+  echo '      | xargs -r -I {} wget -qO - {} 2> /dev/null \' ; \
+  echo '      | bsdtar -xvf- -C "${HOME}/.tflint.d/plugins" > /dev/null 2>&1 ;' ; \
+  echo '    ) >&${fd}' ; \
+  echo '    {' ; \
+  echo '      flock -s "${fd}" ;' ; \
+  echo '      echo "*** ${plugin} installed "' ; \
+  echo '      chmod +x "${HOME}/.tflint.d/plugins/${plugin}" ;' ; \
+  echo '      flock -u "${fd}" ;' ; \
+  echo '    } <&${fd}' ; \
+  echo '    [ -r "${lockfile}" ] && rm "${lockfile}" ;' ; \
+  echo '  fi' ; \
+  echo 'done ;' ; \
+  echo 'rm "${self}" ;' ; \
+  ) | tee "${HOME}/.init.d/tflint.sh" > /dev/null \
+  && chmod +x "${HOME}/.init.d/tflint.sh" \
+  && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/tflint.sh"  ; \
   ) || exit 1 ; \
   tfenv --version >/dev/null 2>&1 && ( \
-    tfenv install "latest" \
-    && tfenv use "latest" ; \
+  tfenv install "latest" \
+  && tfenv use "latest" ; \
   ) ; \
   terraform-docs version > /dev/null 2>&1 && ( \
-    echo 'eval "$(terraform-docs completion bash)" ;' ; \
+  echo 'eval "$(terraform-docs completion bash)" ;' ; \
   ) | tee "/etc/profile.d/terraform.sh" > /dev/null || exit 1 ; \
   compress-packages ;
 # Generic
@@ -697,35 +697,35 @@ RUN \
   "https://aur.archlinux.org/driftctl-bin.git" \
   ) ; \
   GROUPS_ARR=( \
-    "caddy" \
-    "traefik" \
+  "caddy" \
+  "traefik" \
   ) ; \
   pacman --quiet --noprogressbar -S --noconfirm --needed \
   "caddy" \
   "traefik" \
- ; \
+  ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
-    git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
-    && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
-    && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
-    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --nocheck --skipinteg --noconfirm --noprogressbar && break || sleep 15; done \
-    && popd > /dev/null 2>&1 || exit 1 ; \
-    rm -r "/tmp/"$(basename "${url%.git}")"" ; \
-    go clean -modcache ; \
-    su-exec "${USER}" go clean -modcache ; \
-    go clean -cache ; \
-    su-exec "${USER}" go clean -cache ; \
+  git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
+  && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
+  && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
+  for i in {1..5}; do su-exec "${USER}" makepkg -sicr --nocheck --skipinteg --noconfirm --noprogressbar && break || sleep 15; done \
+  && popd > /dev/null 2>&1 || exit 1 ; \
+  rm -r "/tmp/"$(basename "${url%.git}")"" ; \
+  go clean -modcache ; \
+  su-exec "${USER}" go clean -modcache ; \
+  go clean -cache ; \
+  su-exec "${USER}" go clean -cache ; \
   done ; \
   rm -rf "${HOME}/go/pkg/mod" ; \
   for group in "${GROUPS_ARR[@]}";do \
-    getent group "${group}" > /dev/null 2>&1 && usermod -aG "${group}" "${USER}" || continue ; \
+  getent group "${group}" > /dev/null 2>&1 && usermod -aG "${group}" "${USER}" || continue ; \
   done ; \
   python3 -m pip install -q --no-cache-dir --break-system-packages \
-    "checkov" \
+  "checkov" \
   driftctl version >/dev/null 2>&1 && ( \
   echo 'eval "$(driftctl completion bash)" ;' ; \
   ) | tee -a "/etc/profile.d/generic-iac.sh" > /dev/null ; \
-  compress-packages ; 
+  compress-packages ;
 # ────────────────────────────────────────────────────────────────────────────────
 # SHELL ["/usr/bin/pwsh", "-NoLogo", "-Command"]
 # # hadolint ignore=DL4006
@@ -738,8 +738,8 @@ RUN \
 # This is to minimize the image size during build time as large
 # images can lead to Gitpod build timing out
 RUN \
-[ ! -d "${HOME}/.init.d/" ] && ( mkdir "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
-( \
+  [ ! -d "${HOME}/.init.d/" ] && ( mkdir "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
+  ( \
   echo '#!/usr/bin/env bash' ; \
   echo 'export PIP_NO_CACHE_DIR="off"' ; \
   echo 'export MAKEFLAGS="-j$(nproc)"' ; \
@@ -787,7 +787,6 @@ RUN \
   echo '      "aur/dockerfile-language-server-bin" \' ; \
   echo '      "aur/terraform-ls-bin" \' ; \
   echo '      "aur/pipr-git" \' ; \
-  echo '      "aur/aichat-bin" \' ; \
   echo '      "chaotic-aur/google-cloud-cli" \' ; \
   echo '      "cargo-make" \' ; \
   echo '      "cargo-edit" \' ; \
@@ -854,14 +853,14 @@ RUN \
   echo '      "vscode-json-languageserver" \' ; \
   echo '      "gopls" \' ; \
   echo '      "marksman" \' ; \
-  echo '      "cfssl" ;' ; \
-  echo '  curl -fsSL "https://plandex.ai/install.sh" | bash > /dev/null 2>&1 ;' ; \
-  echo '  sudo touch "/.extra-pkgs"' ; \
+  echo '      "cfssl" \' ; \
+  echo '  && curl -fsSL "https://plandex.ai/install.sh" | bash > /dev/null 2>&1 \' ; \
+  echo '  && sudo touch "/.extra-pkgs"' ; \
   echo ')' ; \
   echo 'rm "${self}"' ; \
-) | tee "${HOME}/.init.d/pacman" > /dev/null \
-&& chmod +x "${HOME}/.init.d/pacman" \
-&& chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/pacman" ;
+  ) | tee "${HOME}/.init.d/pacman" > /dev/null \
+  && chmod +x "${HOME}/.init.d/pacman" \
+  && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/pacman" ;
 
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                   user profile config                    │
@@ -870,7 +869,7 @@ USER "${USER}"
 WORKDIR "${WORKDIR}"
 RUN \
   ( \
-    echo '[ -r "/entrypoint" ] && exec /entrypoint bash --login' ; \
+  echo '[ -r "/entrypoint" ] && exec /entrypoint bash --login' ; \
   ) | tee "${HOME}/.bashrc" > /dev/null ; \
   # ─── SSH SETUP ──────────────────────────────────────────────────────────────────
   mkdir -p "${HOME}/.ssh" \
@@ -898,7 +897,7 @@ RUN \
 USER "root"
 # hadolint ignore=SC2016
 RUN \
-( \
+  ( \
   echo 'set -euo pipefail ;' ; \
   echo 'chmod 700 "${HOME}/.ssh" ;' ; \
   echo '[ -r "${HOME}/.ssh/authorized_keys" ] && chmod 644 "${HOME}/.ssh/authorized_keys" ;' ; \
@@ -907,8 +906,8 @@ RUN \
   echo 'find "${HOME}/.ssh" -type f -name "id*" -exec chmod 600 {} \;' ; \
   echo 'find "${HOME}/.ssh" -type f -name "id*.pub" -exec chmod 644 {} \;' ; \
   echo 'exit 0 ;' ; \
-) | tee /usr/local/share/fix-ssh-permissions.sh > /dev/null \
-&& chmod +x /usr/local/share/fix-ssh-permissions.sh  ;
+  ) | tee /usr/local/share/fix-ssh-permissions.sh > /dev/null \
+  && chmod +x /usr/local/share/fix-ssh-permissions.sh  ;
 # hadolint ignore=SC2016,SC2046
 RUN \
   ln -sf "/usr/share/zoneinfo/America/New_York" "/etc/localtime" ; \
@@ -927,36 +926,36 @@ RUN \
 USER "root"
 # hadolint ignore=DL4001
 RUN \
-    ARCH="x64" ; \
-    tag="$(curl --silent "https://api.github.com/repos/microsoft/vscode/releases/latest" \
-    | grep '"tag_name":' \
-    | sed -E 's/.*"([^"]+)".*/\1/')"; \
-    tag_data="$(curl --silent "https://api.github.com/repos/microsoft/vscode/git/ref/tags/${tag}")" ; \
-    sha="$(echo "${tag_data}" \
-    | grep '"sha":' \
-    | sed -E 's/.*"([^"]+)".*/\1/' )"; \
-    sha_type="$(echo "${tag_data}" \
-    | grep '"type":' \
-    | sed -E 's/.*"([^"]+)".*/\1/')" ; \
-    if [ "${sha_type}" != "commit" ]; then \
-      combo_sha="$(curl -s "https://api.github.com/repos/microsoft/vscode/git/tags/${sha}" \
-      | grep '"sha":' \
-      | sed -E 's/.*"([^"]+)".*/\1/')"; \
-      sha=$(echo "${combo_sha}" | sed -E "s/${sha}//" | xargs) ; \
-    fi ; \
-    [ -z "${sha}" ] && exit 1 ; \
-    mkdir -vp "${HOME}/.vscode-server/bin/${sha}" \
-    && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.vscode-server/bin/${sha}" \
-    && wget -qO - \
-      "https://update.code.visualstudio.com/commit:${sha}/server-linux-${ARCH}/stable" \
-    | su-exec "${USER}" tar \
-      --no-same-owner \
-      -xzv \
-      --strip-components=1 \
-      -C "${HOME}/.vscode-server/bin/${sha}" \
-    && [ -r "${HOME}/.vscode-server/bin/${sha}/bin/remote-cli/code" ] \
-    && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.vscode-server" \
-    && ln -sf "${HOME}/.vscode-server/bin/${sha}/bin/remote-cli/code" "/usr/local/bin/code" ;
+  ARCH="x64" ; \
+  tag="$(curl --silent "https://api.github.com/repos/microsoft/vscode/releases/latest" \
+  | grep '"tag_name":' \
+  | sed -E 's/.*"([^"]+)".*/\1/')"; \
+  tag_data="$(curl --silent "https://api.github.com/repos/microsoft/vscode/git/ref/tags/${tag}")" ; \
+  sha="$(echo "${tag_data}" \
+  | grep '"sha":' \
+  | sed -E 's/.*"([^"]+)".*/\1/' )"; \
+  sha_type="$(echo "${tag_data}" \
+  | grep '"type":' \
+  | sed -E 's/.*"([^"]+)".*/\1/')" ; \
+  if [ "${sha_type}" != "commit" ]; then \
+  combo_sha="$(curl -s "https://api.github.com/repos/microsoft/vscode/git/tags/${sha}" \
+  | grep '"sha":' \
+  | sed -E 's/.*"([^"]+)".*/\1/')"; \
+  sha=$(echo "${combo_sha}" | sed -E "s/${sha}//" | xargs) ; \
+  fi ; \
+  [ -z "${sha}" ] && exit 1 ; \
+  mkdir -vp "${HOME}/.vscode-server/bin/${sha}" \
+  && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.vscode-server/bin/${sha}" \
+  && wget -qO - \
+  "https://update.code.visualstudio.com/commit:${sha}/server-linux-${ARCH}/stable" \
+  | su-exec "${USER}" tar \
+  --no-same-owner \
+  -xzv \
+  --strip-components=1 \
+  -C "${HOME}/.vscode-server/bin/${sha}" \
+  && [ -r "${HOME}/.vscode-server/bin/${sha}/bin/remote-cli/code" ] \
+  && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.vscode-server" \
+  && ln -sf "${HOME}/.vscode-server/bin/${sha}/bin/remote-cli/code" "/usr/local/bin/code" ;
 # ────────────────────────────────────────────────────────────────────────────────
 USER "root"
 # https://stackoverflow.com/a/37541105

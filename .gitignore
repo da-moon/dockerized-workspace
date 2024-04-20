@@ -43,6 +43,7 @@
 !/Justfile
 !/Makefile
 !/Vagrantfile
+!/build.sh
 !/docker-bake.hcl
 !/CONTRIBUTING.md
 !/CHANGELOG.md
