@@ -192,25 +192,6 @@ RUN \
     rm -r "/tmp/"$(basename "${url%.git}")"" \
     && popd > /dev/null 2>&1 || exit 1 ; \
   done ; 
-#  ╭──────────────────────────────────────────────────────────
-#  │                       shells                             │
-#  ╰──────────────────────────────────────────────────────────╯
-USER "root"
-SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
-# hadolint ignore=SC2016
-RUN \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  pacman --quiet --noprogressbar -S --noconfirm --needed "starship" "chaotic-aur/powershell-bin" ; \
-  pwsh --version > /dev/null 2>&1 ; \
-  starship --version > /dev/null 2>&1 \
-  && echo 'eval "$(starship init bash)" ;' > "/etc/profile.d/starship.sh" || exit 1 ; \
-  rm -rf "${HOME}/go/pkg/mod" ; \
-  compress-packages ;
-USER "${USER}"
-SHELL ["/usr/bin/pwsh", "-NoLogo", "-Command"]
-RUN $parent=Split-Path -parent $PROFILE ; if (-not(Test-Path -Path $parent -PathType Container)) {$null = New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop}
-SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                         docker                           │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -249,76 +230,37 @@ RUN \
     echo "alias reveal-md='docker run --rm  -u \"\$(id -u):\$(id -g)\" -p \"1948:1948\" -p \"35729:35729\" -v \"\$(pwd):/slides\" \"webpronl/reveal-md:latest\" /slides --watch' ;" ; \
   ) | tee "/etc/profile.d/docker.sh" > /dev/null || exit 1 ;
 
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                          gitpod                          │
-#  ╰──────────────────────────────────────────────────────────╯
-# hadolint ignore=SC2016
-RUN \
-  ( \
-  # ensures shell always has the latest gipod variables
-  echo 'if gp version > /dev/null 2>&1 ; then' ;\
-  echo '  eval "$(gp env --export)" ;' ;\
-  echo 'fi' ;\
-  ) | tee "/etc/profile.d/gitpod.sh" > /dev/null || exit 1
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                     fuzzy finders                        │
-#  ╰──────────────────────────────────────────────────────────╯
-USER "root"
-# hadolint ignore=SC2016
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet -S --noconfirm --needed "fzf" > /dev/null 2>&1 ; \
-  fzf --version > /dev/null 2>&1 && ( \
-  echo '_fzf_complete_make() {' ; \
-  echo '  FZF_COMPLETION_TRIGGER="" _fzf_complete "-1" "${@}" < <(make -pqr 2>/dev/null \' ; \
-  echo '  | awk -F":" "/^[a-zA-Z0-9][^\$#\/\t=]*:([^=]|\$)/ {split(\$1,A,/ /);for(i in A)print A[i]}" \' ; \
-  echo '  | grep -v Makefile \' ; \
-  echo '  | sort -u)' ; \
-  echo '}' ; \
-  echo '[[ -n ${BASH} ]] && complete -F _fzf_complete_make -o default -o bashdefault make' ; \
-  echo '[ -r "/usr/share/fzf/key-bindings.bash" ] && source "/usr/share/fzf/key-bindings.bash"' ; \
-  echo '[ -r "/usr/share/fzf/completion.bash" ] && source "/usr/share/fzf/completion.bash"' ; \
-  ) | tee "/etc/profile.d/fzf.sh" > /dev/null || exit 1 ; \
-  compress-packages ;
 
 #  ╭──────────────────────────────────────────────────────────╮
-#  │               build tools and task runners               │
+#  │                      useful dev cli tools                │
 #  ╰──────────────────────────────────────────────────────────╯
 USER "root"
+ENV COLORTERM="truecolor"
+ENV EDITOR="hx"
+ENV VISUAL="hx"
+ENV _ZO_DATA_DIR="/workspace/zoxide/"
 # hadolint ignore=SC2016
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet -S --noconfirm --needed "just" "make" "go-task" ; \
-  go-task --version > /dev/null 2>&1 && ( \
-    ln -sf "$(which "go-task" 2>/dev/null)" "/usr/local/bin/task" ; \
-  ) || exit 1 ; \
-  just --version > /dev/null 2>&1 && ( \
-    echo 'eval "$(just --completions bash)" ;' > "/etc/profile.d/just.sh" ; \
-  ) || exit 1 ; \
-  compress-packages ;
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                          git                             │
-#  ╰──────────────────────────────────────────────────────────╯
-USER "root"
-# hadolint ignore=SC2016
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet --noprogressbar -S --noconfirm --needed \
+  pacman --quiet -S --noconfirm --needed \
+    "chaotic-aur/powershell-bin" \
+    "starship" \
+    "fzf" \
     "github-cli" \
     "git-delta" \
-    "difftastic" ; \
-  gh --version > /dev/null 2>&1 && ( \
-    echo 'eval "$(gh completion -s bash)" ;' > "/etc/profile.d/gh.sh" ; \
-    pwsh --version && ( \
-      pwsh -c ' \
-      "Invoke-Expression -Command $(gh completion -s powershell | Out-String)" \
-      | Out-File -Append -Encoding ascii "$PROFILE" \
-      ' ; \
-    ) || exit 0 ; \
-  ) || exit 1 ; \
+    "difftastic" \
+    "zellij" \
+    "zoxide" \
+    "xplr" \
+    "ripgrep" \
+    "eza" \
+    "atuin" \
+    "bash-preexec" \
+    "bat" \
+    "just" \
+    "make" \
+    "go-task" ; \
   # ─── USE DELTA FOR GIT DIFFS ────────────────────────────────────────────────────
   delta --version > /dev/null 2>&1 && ( \
     git config --system pager.diff delta \
@@ -338,28 +280,13 @@ RUN \
     && git config --system delta.decorations.hunk-header-style "file line-number syntax" \
     && git config --system delta.interactive.keep-plus-minus-markers "false" \
   ) || exit 1 ; \
-  compress-packages ;
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                  modern cli applications                 │
-#  ╰──────────────────────────────────────────────────────────╯
-USER "root"
-ENV COLORTERM="truecolor"
-ENV EDITOR="hx"
-ENV VISUAL="hx"
-ENV _ZO_DATA_DIR="/workspace/zoxide/"
-# hadolint ignore=SC2016
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet --noprogressbar -S --noconfirm --needed \
-    "zellij" \
-    "zoxide" \
-    "xplr" \
-    "ripgrep" \
-    "eza" \
-    "atuin" \
-    "bash-preexec" \
-    "bat" ; \
+  go-task --version > /dev/null 2>&1 && ( \
+    ln -sf "$(which "go-task" 2>/dev/null)" "/usr/local/bin/task" ; \
+  ) || exit 1 ; \
+  starship --version > /dev/null 2>&1 && echo 'eval "$(starship init bash)" ;' > "/etc/profile.d/starship.sh" || exit 1 ; \
+  just --version > /dev/null 2>&1 && ( \
+    echo 'eval "$(just --completions bash)" ;' > "/etc/profile.d/just.sh" ; \
+  ) || exit 1 ; \
   zoxide --version && ( \
     ( \
       echo 'export _ZO_DATA_DIR="/workspace/zoxide" ; ' ; \
@@ -379,14 +306,15 @@ RUN \
     echo 'alias llt="eza -T" ;' ; \
     echo 'alias ls="eza" ;' ; \
   ) | tee "/etc/profile.d/eza.sh" > /dev/null || exit 1 ; \
-  ( \
-    echo 'if hx --version > /dev/null 2>&1 ; then' ;\
-    echo '  export EDITOR="hx" ;' ;\
-    echo '  export VISUAL="hx" ;' ;\
-    echo '  [ ! -d "${HOME}/.config/helix" ] && mkdir "${HOME}/.config/helix" ;' ; \
-    echo '  wget -qO "${HOME}/.config/helix/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/helix/config.toml" ;' ; \
-    echo 'fi' ;\
-  ) | tee "/etc/profile.d/editor.sh" > /dev/null || exit 1 ; \
+  gh --version > /dev/null 2>&1 && ( \
+    echo 'eval "$(gh completion -s bash)" ;' > "/etc/profile.d/gh.sh" ; \
+    pwsh --version && ( \
+      pwsh -c ' \
+      "Invoke-Expression -Command $(gh completion -s powershell | Out-String)" \
+      | Out-File -Append -Encoding ascii "$PROFILE" \
+      ' ; \
+    ) || exit 0 ; \
+  ) || exit 1 ; \
   atuin --version > /dev/null 2>&1 && ( \
     echo '[ ! -d "${HOME}/.config/atuin" ] && mkdir "${HOME}/.config/atuin" ;' ; \
     echo 'wget -qO "${HOME}/.config/atuin/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/atuin/config.toml" ;' ; \
@@ -399,7 +327,36 @@ RUN \
     echo '[ ! -d "${HOME}/.config/xplr" ] && mkdir -p "${HOME}/.config/xplr" ;' ; \
     echo 'wget -qO "${HOME}/.config/xplr/init.lua" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/xplr/init.lua" ;' ; \
   ) | tee "/etc/profile.d/xplr.sh" > /dev/null  || exit 1 ; \
+  fzf --version > /dev/null 2>&1 && ( \
+    echo '_fzf_complete_make() {' ; \
+    echo '  FZF_COMPLETION_TRIGGER="" _fzf_complete "-1" "${@}" < <(make -pqr 2>/dev/null \' ; \
+    echo '  | awk -F":" "/^[a-zA-Z0-9][^\$#\/\t=]*:([^=]|\$)/ {split(\$1,A,/ /);for(i in A)print A[i]}" \' ; \
+    echo '  | grep -v Makefile \' ; \
+    echo '  | sort -u)' ; \
+    echo '}' ; \
+    echo '[[ -n ${BASH} ]] && complete -F _fzf_complete_make -o default -o bashdefault make' ; \
+    echo '[ -r "/usr/share/fzf/key-bindings.bash" ] && source "/usr/share/fzf/key-bindings.bash"' ; \
+    echo '[ -r "/usr/share/fzf/completion.bash" ] && source "/usr/share/fzf/completion.bash"' ; \
+  ) | tee "/etc/profile.d/fzf.sh" > /dev/null || exit 1 ; \
+  ( \
+    echo 'if hx --version > /dev/null 2>&1 ; then' ;\
+    echo '  export EDITOR="hx" ;' ;\
+    echo '  export VISUAL="hx" ;' ;\
+    echo '  [ ! -d "${HOME}/.config/helix" ] && mkdir "${HOME}/.config/helix" ;' ; \
+    echo '  wget -qO "${HOME}/.config/helix/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/helix/config.toml" ;' ; \
+    echo 'fi' ;\
+  ) | tee "/etc/profile.d/editor.sh" > /dev/null || exit 1 ; \
+  ( \
+    # ensures shell always has the latest gipod variables
+    echo 'if gp version > /dev/null 2>&1 ; then' ;\
+    echo '  eval "$(gp env --export)" ;' ;\
+    echo 'fi' ;\
+  ) | tee "/etc/profile.d/gitpod.sh" > /dev/null || exit 1 ; \
   compress-packages ;
+USER "${USER}"
+SHELL ["/usr/bin/pwsh", "-NoLogo", "-Command"]
+RUN $parent=Split-Path -parent $PROFILE ; if (-not(Test-Path -Path $parent -PathType Container)) {$null = New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop}
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 #  ────────────────────────────────────────────────────────────
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 rust setup                               │
@@ -463,86 +420,64 @@ RUN \
     upx "$(which "${BIN}")" ; \
   done ; < <(cat "${CARGO_HOME}/.crates2.json"  | jq -r ".installs | to_entries[].value.bins[]" | sort -u)
 RUN du --human-readable --max-depth 1 "${HOME}" > /.rustup
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                 install go packages                      │
-#  ╰──────────────────────────────────────────────────────────╯
+
 USER "root"
-ENV GO111MODULE="on"
-ENV CGO_ENABLED="0"
-ENV CGO_LDFLAGS="-s -w -extldflags '-static'"
-# hadolint ignore=SC2016,SC2076
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman -S --noconfirm --needed "go" > /dev/null 2>&1 \
-  && go version > /dev/null 2>&1 \
-  &&  ( \
-  echo 'export PATH="${PATH}:$(go env GOPATH)/bin";' ; \
-  ) | tee "/etc/profile.d/go.sh" > /dev/null || exit 1 ; \
-  compress-packages ;
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                 install lua packages                     │
-#  ╰──────────────────────────────────────────────────────────╯
-USER "root"
-ENV PATH="${PATH}:${HOME}/.luarocks/bin"
-# hadolint ignore=SC2016
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman -S --noconfirm --needed "lua" "luajit" "luarocks" > /dev/null 2>&1 ; \
-  compress-packages ;
+
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 install ruby packages                    │
 #  ╰──────────────────────────────────────────────────────────╯
 USER "root"
-ENV GEM_PATH="${HOME}/.gem"
 # hadolint ignore=SC2016,DL3028
 RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
+  gem install --quiet --no-user-install "bundler" "serverspec" \
+
+  ENV PATH="${PATH}:${HOME}/.local/bin"
+  ENV GEM_PATH="${HOME}/.gem"
+  ENV PATH="${PATH}:${HOME}/.luarocks/bin"
+  ENV GO111MODULE="on"
+  ENV CGO_ENABLED="0"
+  ENV CGO_LDFLAGS="-s -w -extldflags '-static'"
+
+  pacman -S --noconfirm --needed "lua" "luajit" "luarocks" > /dev/null 2>&1 ; \
+  #  ╭──────────────────────────────────────────────────────────╮
+  #  │                     go setup                             │
+  #  ╰──────────────────────────────────────────────────────────╯
+  pacman -S --noconfirm --needed "go" > /dev/null 2>&1 \
+  && go version > /dev/null 2>&1 && ( \
+    echo 'export PATH="${PATH}:$(go env GOPATH)/bin";' ; \
+  ) | tee "/etc/profile.d/go.sh" > /dev/null || exit 1 ; \
+  #  ╭──────────────────────────────────────────────────────────╮
+  #  │                     ruby setup                           │
+  #  ╰──────────────────────────────────────────────────────────╯
   pacman --quiet --noprogressbar -S --noconfirm --needed "ruby" \
-  && gem --version > /dev/null 2>&1 \
-  && gem install --quiet --no-user-install "bundler" "serverspec" \
-  &&  ( \
+  && gem --version > /dev/null 2>&1 && ( \
     echo 'export GEM_HOME="$(ruby -e "puts Gem.user_dir")";' ; \
     echo 'export PATH="${PATH}:${GEM_HOME}/bin";' ; \
   ) | tee "/etc/profile.d/ruby.sh" > /dev/null || exit 1 ; \
-  compress-packages ;
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                     python packages                      │
-#  ╰──────────────────────────────────────────────────────────╯
-USER "root"
-ENV PATH="${PATH}:${HOME}/.local/bin"
-# hadolint ignore=DL3004,SC2016
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
+  #  ╭──────────────────────────────────────────────────────────╮
+  #  │                     python setup                         │
+  #  ╰──────────────────────────────────────────────────────────╯  
   pacman --quiet --noprogressbar -S --noconfirm --needed "python" "python-pip" "python-setuptools" \
   && sudo -i -u "${USER}" \
     bash -c 'curl -sSL https://install.python-poetry.org | python3 -' > /dev/null 2>&1 \
   && ln -sf "${HOME}/.local/bin/poetry" "/usr/local/bin/poetry" \
-  && poetry --version > /dev/null 2>&1 \
-  && ( \
-  echo 'eval "$(poetry completions bash)" ;' ; \
+  && poetry --version > /dev/null 2>&1 && ( \
+    echo 'eval "$(poetry completions bash)" ;' ; \
   ) | tee "/etc/profile.d/poetry.sh" > /dev/null || exit 1 ; \
-  compress-packages ;
+  #  ╭──────────────────────────────────────────────────────────╮
+  #  │                 nodejs setup                             │
+  #  ╰──────────────────────────────────────────────────────────╯
+  pacman --quiet --noprogressbar -S --noconfirm --needed "nodejs" "npm" "yarn" \
+  && node  --version >/dev/null 2>&1 && npm  --version >/dev/null 2>&1 && echo 'export PATH="$(npm -g bin):${PATH}" ;' > "/etc/profile.d/npm.sh" || exit 1 \
+  && yarn --version >/dev/null 2>&1 && echo 'export PATH="$(yarn global bin):${PATH}" ;' > "/etc/profile.d/yarn.sh" || exit 1 \
+
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 install nodejs packages                  │
 #  ╰──────────────────────────────────────────────────────────╯
 USER "root"
 # hadolint ignore=SC2016
 RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet --noprogressbar -S --noconfirm --needed "nodejs" \
-  && node  --version >/dev/null 2>&1 \
-  && pacman --quiet --noprogressbar -S --noconfirm --needed "npm" \
-  && npm  --version >/dev/null 2>&1 \
-  && echo 'export PATH="$(npm -g bin):${PATH}" ;' > "/etc/profile.d/npm.sh" || exit 1 \
-  && pacman --quiet --noprogressbar -S --noconfirm --needed "yarn" \
-  && yarn --version >/dev/null 2>&1 \
-  && echo 'export PATH="$(yarn global bin):${PATH}" ;' > "/etc/profile.d/yarn.sh" || exit 1 \
-  && npm install --silent -g \
+  npm install --silent -g \
     "github-label-sync" \
     "remark" \
     "remark-cli" \
@@ -807,13 +742,6 @@ RUN \
   echo '[ ! -r "/.extra-pkgs" ] && (' ; \
   echo '  sudo pacman --quiet --noprogressbar -Syyu --noconfirm \' ; \
   echo '  && paru --quiet --noprogressbar -S --noconfirm --needed --removemake --cleanafter \' ; \
-  echo '      "aur/cargo-make" \' ; \
-  echo '      "aur/cargo-edit" \' ; \
-  echo '      "aur/cargo-deny" \' ; \
-  echo '      "aur/cargo-udeps" \' ; \
-  echo '      "aur/cargo-expand" \' ; \
-  echo '      "aur/cargo-update" \' ; \
-  echo '      "aur/cargo-watch" \' ; \
   echo '      "aur/ttdl" \' ; \
   echo '      "aur/devc-bin" \' ; \
   echo '      "aur/nodejs-cspell" \' ; \
@@ -854,6 +782,13 @@ RUN \
   echo '      "aur/pipr-git" \' ; \
   echo '      "aur/aichat-bin" \' ; \
   echo '      "chaotic-aur/google-cloud-cli" \' ; \
+  echo '      "cargo-make" \' ; \
+  echo '      "cargo-edit" \' ; \
+  echo '      "cargo-deny" \' ; \
+  echo '      "cargo-udeps" \' ; \
+  echo '      "cargo-expand" \' ; \
+  echo '      "cargo-update" \' ; \
+  echo '      "cargo-watch" \' ; \
   echo '      "markdownlint" \' ; \
   echo '      "consul-template" \' ; \
   echo '      "packer" \' ; \
