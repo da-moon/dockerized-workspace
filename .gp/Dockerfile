@@ -27,11 +27,9 @@ sed \
   -e '$aXDG_CONFIG_HOME DEFAULT=@{WORKDIR}/.config' \
   -e '$aXDG_DATA_HOME   DEFAULT=@{WORKDIR}/.local/share' \
   -e '$aXDG_STATE_HOME  DEFAULT=@{WORKDIR}/.local/state' \
-  "/etc/security/pam_env.conf" ;
-# hadolint ignore=DL3059
-RUN \
+  "/etc/security/pam_env.conf" \
   # ─── DOWNLOAD SIXTEEN PACKAGES CONCURRENTLY ─────────────────────────────────────
-  sed -i \
+  && sed -i \
   -e "/ParallelDownloads/d" \
   -e  '/\[options\]/a ParallelDownloads = 16' \
   "/etc/pacman.conf" \
@@ -52,7 +50,10 @@ RUN \
     -e "s/PKGEXT.*/PKGEXT='.pkg.tar'/g" \
     "/etc/makepkg.conf" \
   && pacman-key --init > /dev/null 2>&1 \
-  && pacman-key --populate "archlinux" > /dev/null 2>&1 ;
+  && pacman-key --populate "archlinux" > /dev/null 2>&1 \
+  && ( \
+    echo 'alias pacman="sudo pacman"' ; \
+  ) | tee "/etc/profile.d/pacman.sh" > /dev/null ;
 # ────────────────────────────────────────────────────────────
 ARG CHAOTIC_AUR_KEY="3056513887B78AEB"
 # Chaotic-AUR
@@ -65,10 +66,7 @@ RUN \
   && ( \
     echo '[chaotic-aur]' ; \
     echo 'Include = /etc/pacman.d/chaotic-mirrorlist' ; \
-  ) | tee -a "/etc/pacman.conf" > /dev/null \
-  && ( \
-    echo 'alias pacman="sudo pacman"' ; \
-  ) | tee "/etc/profile.d/pacman.sh" > /dev/null ;
+  ) | tee -a "/etc/pacman.conf" > /dev/null ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 finding fastest sources                  │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -185,6 +183,7 @@ RUN \
   export MAKEFLAGS="-j$(nproc)" ; \
   AUR_CLONE_URLS=( \
   "https://aur.archlinux.org/su-exec.git" \
+  "https://aur.archlinux.org/paru-bin.git" \
   ) ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
     git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
@@ -440,21 +439,12 @@ RUN \
     echo 'export PATH="${PATH}:${CARGO_HOME}/bin";' ; \
   ) | tee -a "/etc/profile.d/00-rust.sh" > /dev/null \
   rustup toolchain install "stable" \
-  && cargo install --locked "cargo-binstall" \
   && cargo install --locked --git "https://hg.sr.ht/~cyplo/legdur" \
   && cargo install --locked --git "https://github.com/flatt-security/shisho.git" \
   && cargo binstall --quiet --no-confirm \
     "cargo-cache" \
-    "cargo-make" \
-    "cargo-edit" \
-    "cargo-deny" \
-    "cargo-udeps" \
-    "cargo-update" \
-    "pipr" \
-    "cargo-watch" \
     "smartcat" \
     "aichat" \
-    "ttdl" \
     "prose" \
   && cargo-cache --remove-dir "all" > /dev/null 2>&1 \
   && rustup toolchain list | cut -d' ' -f1 | xargs -r -I {} rustup --quiet toolchain uninstall {} ; \
@@ -552,50 +542,22 @@ RUN \
   && pacman --quiet --noprogressbar -S --noconfirm --needed "yarn" \
   && yarn --version >/dev/null 2>&1 \
   && echo 'export PATH="$(yarn global bin):${PATH}" ;' > "/etc/profile.d/yarn.sh" || exit 1 ; \
-  compress-packages ;
-# hadolint ignore=DL3016
-RUN \
-  npm install --silent -g \
-  "@devcontainers/cli" \
-  "@commitlint/cli" \
-  "@commitlint/config-conventional" \
-  "cspell-cli" \
-  "github-label-sync" \
-  "markdownlint-cli" \
-  "remark" \
-  "remark-cli" \
-  "remark-frontmatter" \
-  "remark-stringify" \
-  "remark-toc" \
-  "remark-preset-lint-recommended" \
-  "remark-lint-list-item-indent" \
-  "remark-reference-links" \
-  && npm cache clean --quiet --force ;
+  && npm install --silent -g \
+    "github-label-sync" \
+    "remark" \
+    "remark-cli" \
+    "remark-frontmatter" \
+    "remark-stringify" \
+    "remark-toc" \
+    "remark-preset-lint-recommended" \
+    "remark-lint-list-item-indent" \
+    "remark-reference-links" \
+  && npm cache clean --quiet --force \
+  && compress-packages ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                      dev tools                           │
 #  ╰──────────────────────────────────────────────────────────╯
-USER "root"
-# Install language servers
-# hadolint ignore=DL3016,DL3013
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  export PIP_NO_CACHE_DIR="off" ; \
-  # aur/awk-language-server
-  # aur/dockerfile-language-server-bin
-  # aur/terraform-ls-bin
-  pacman --quiet --noprogressbar -S --noconfirm --needed \
-  "python-lsp-jsonrpc" "python-lsp-black" "python-lsp-server" "bash-language-server" "yaml-language-server" "vscode-json-languageserver" "gopls" "marksman" ; \
-  curl -fsSL "https://plandex.ai/install.sh" | bash > /dev/null 2>&1 ; \
-  npm install -g --silent awk-language-server && awk-language-server --version > /dev/null 2>&1 && \
-  npm install -g --silent dockerfile-language-server-nodejs && docker-langserver --node-ipc > /dev/null 2>&1 && \
-  go version > /dev/null 2>&1 && { \
-    go install github.com/hashicorp/terraform-ls@latest && ln -sf "$(go env GOPATH)/bin/terraform-ls" "/usr/local/bin/terraform-ls" && terraform-ls version > /dev/null 2>&1 ; \
-  } ; \
-  && marksman --version > /dev/null 2>&1 \
-  && npm cache clean --quiet --force \
-  && go clean -modcache > /dev/null 2>&1 \
-  && chown "$(id -u "${USER}"):$(id -g "${USER}")" -R "$(go env GOPATH)" "${HOME}" ;
+
 #
 # The following logins and runs the command. The login cause rust toolchain to get
 # Installed which makes the image larger
@@ -834,23 +796,65 @@ RUN \
 # This is to minimize the image size during build time as large
 # images can lead to Gitpod build timing out
 RUN \
-  [ ! -d "${HOME}/.init.d/" ] && ( mkdir "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
+[ ! -d "${HOME}/.init.d/" ] && ( mkdir "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
 ( \
-  #  ╭──────────────────────────────────────────────────────────╮
-  #  │                   package manager                        │
-  #  ╰──────────────────────────────────────────────────────────╯
-  # NOTE: updating packages and installing large packages when gitpod container launches.
-  # This is to minimize the image size during build time as large
-  # images can lead to Gitpod build timing out
   echo '#!/usr/bin/env bash' ; \
   echo 'export PIP_NO_CACHE_DIR="off"' ; \
   echo 'export MAKEFLAGS="-j$(nproc)"' ; \
   echo 'export CGO_ENABLED=1' ; \
   echo 'export CGO_LDFLAGS="-g -O2"' ; \
   echo 'self="$(realpath -s "${BASH_SOURCE[0]}")"' ; \
-  echo '[ ! -r "/.pacman-bootstrap" ] && (' ; \
-  echo '  sudo pacman --quiet --noprogressbar -Su --noconfirm \' ; \
-  echo '    && sudo pacman --quiet --noprogressbar -S --noconfirm --needed \' ; \
+  echo '[ ! -r "/.extra-pkgs" ] && (' ; \
+  echo '  sudo pacman --quiet --noprogressbar -Syyu --noconfirm \' ; \
+  echo '  && paru --quiet --noprogressbar -S --noconfirm --needed --removemake --cleanafter \' ; \
+  echo '      "aur/cargo-make" \' ; \
+  echo '      "aur/cargo-edit" \' ; \
+  echo '      "aur/cargo-deny" \' ; \
+  echo '      "aur/cargo-udeps" \' ; \
+  echo '      "aur/cargo-expand" \' ; \
+  echo '      "aur/cargo-update" \' ; \
+  echo '      "aur/cargo-watch" \' ; \
+  echo '      "aur/ttdl" \' ; \
+  echo '      "aur/devc-bin" \' ; \
+  echo '      "aur/nodejs-cspell" \' ; \
+  echo '      "aur/commitlint" \' ; \
+  echo '      "aur/commitlint-config-conventional" \' ; \
+  echo '      "aur/earthly-bin" \' ; \
+  echo '      "aur/forgit" \' ; \
+  echo '      "aur/git-fuzzy-git" \' ; \
+  echo '      "aur/git-completion" \' ; \
+  echo '      "aur/git-shelf" \' ; \
+  echo '      "aur/diffsitter-bin" \' ; \
+  echo '      "aur/vendir-bin" \' ; \
+  echo '      "aur/qsv-bin" \' ; \
+  echo '      "aur/shellcheck-bin" \' ; \
+  echo '      "aur/docker-sbom" \' ; \
+  echo '      "aur/fzfx-git" \' ; \
+  echo '      "aur/fzf-extras" \' ; \
+  echo '      "aur/aura-bin" \' ; \
+  echo '      "aur/paru-bin" \' ; \
+  echo '      "aur/shellcheck-bin" \' ; \
+  echo '      "aur/terrascan" \' ; \
+  echo '      "aur/opa" \' ; \
+  echo '      "aur/pulumictl" \' ; \
+  echo '      "aur/infracost" \' ; \
+  echo '      "aur/k6" \' ; \
+  echo '      "aur/rancher-k3d-bin" \' ; \
+  echo '      "aur/envoyproxy-bin" \' ; \
+  echo '      "aur/gojira" \' ; \
+  echo '      "aur/litmusctl" \' ; \
+  echo '      "aur/inlyne-bin" \' ; \
+  echo '      "aur/jql" \' ; \
+  echo '      "aur/ripsecrets" \' ; \
+  echo '      "aur/rnr-bin" \' ; \
+  echo '      "aur/semgrep-bin" \' ; \
+  echo '      "aur/awk-language-server" \' ; \
+  echo '      "aur/dockerfile-language-server-bin" \' ; \
+  echo '      "aur/terraform-ls-bin" \' ; \
+  echo '      "aur/pipr-git" \' ; \
+  echo '      "aur/aichat-bin" \' ; \
+  echo '      "chaotic-aur/google-cloud-cli" \' ; \
+  echo '      "markdownlint" \' ; \
   echo '      "consul-template" \' ; \
   echo '      "packer" \' ; \
   echo '      "azure-cli" \' ; \
@@ -900,49 +904,18 @@ RUN \
   echo '      "pulumi" \' ; \
   echo '      "istio" \' ; \
   echo '      "trivy" \' ; \
-  echo '      "cfssl" \' ; \
-  echo '      "chaotic-aur/google-cloud-cli"' ; \
-  echo '  sudo touch "/.pacman-bootstrap"' ; \
+  echo '      "python-lsp-jsonrpc" \' ; \
+  echo '      "python-lsp-black" \' ; \
+  echo '      "python-lsp-server" \' ; \
+  echo '      "bash-language-server" \' ; \
+  echo '      "yaml-language-server" \' ; \
+  echo '      "vscode-json-languageserver" \' ; \
+  echo '      "gopls" \' ; \
+  echo '      "marksman" \' ; \
+  echo '      "cfssl" ;' ; \
+  echo '  curl -fsSL "https://plandex.ai/install.sh" | bash > /dev/null 2>&1 ;' ; \
+  echo '  sudo touch "/.extra-pkgs"' ; \
   echo ')' ; \
-  echo 'AUR_CLONE_URLS=(' ; \
-  echo '  "https://aur.archlinux.org/earthly-bin.git"' ; \
-  echo '  "https://aur.archlinux.org/forgit.git"' ; \
-  echo '  "https://aur.archlinux.org/git-fuzzy-git.git"' ; \
-  echo '  "https://aur.archlinux.org/git-completion.git"' ; \
-  echo '  "https://aur.archlinux.org/git-shelf.git"' ; \
-  echo '  "https://aur.archlinux.org/diffsitter-bin.git"' ; \
-  echo '  "https://aur.archlinux.org/vendir-bin.git"' ; \
-  echo '  "https://aur.archlinux.org/qsv-bin.git"' ; \
-  echo '  "https://aur.archlinux.org/shellcheck-bin.git"' ; \
-  echo '  "https://aur.archlinux.org/docker-sbom.git"' ; \
-  echo '  "https://aur.archlinux.org/fzfx-git.git"' ; \
-  echo '  "https://aur.archlinux.org/fzf-extras.git"' ; \
-  echo '  "https://aur.archlinux.org/aura-bin.git"' ; \
-  echo '  "https://aur.archlinux.org/paru-bin.git"' ; \
-  echo '  "https://aur.archlinux.org/shellcheck-bin.git"' ; \
-  echo '  "https://aur.archlinux.org/terrascan.git"' ; \
-  echo '  "https://aur.archlinux.org/opa.git"' ; \
-  echo '  "https://aur.archlinux.org/pulumictl.git"' ; \
-  echo '  "https://aur.archlinux.org/infracost.git"' ; \
-  echo '  "https://aur.archlinux.org/k6.git" ' ; \
-  echo '  "https://aur.archlinux.org/rancher-k3d-bin.git" ' ; \
-  echo '  "https://aur.archlinux.org/envoyproxy-bin.git" ' ; \
-  echo '  "https://aur.archlinux.org/gojira.git" ' ; \
-  echo '  "https://aur.archlinux.org/litmusctl.git" ' ; \
-  echo '  "https://aur.archlinux.org/inlyne-bin.git" ' ; \
-  echo '  "https://aur.archlinux.org/jql.git" ' ; \
-  echo '  "https://aur.archlinux.org/ripsecrets.git" ' ; \
-  echo '  "https://aur.archlinux.org/rnr-bin.git" ' ; \
-  echo '  "https://aur.archlinux.org/semgrep-bin.git" ' ; \
-  echo ')' ; \
-  echo 'for url in "${AUR_CLONE_URLS[@]}"; do' ; \
-  echo '  git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \' ; \
-  echo '    && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \' ; \
-  echo '    && pushd "/tmp/"$(basename "${url%.git}")"" >/dev/null 2>&1' ; \
-  echo '  for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noconfirm && break || sleep 15; done \' ; \
-  echo '    && popd >/dev/null 2>&1 || exit 1' ; \
-  echo '  rm -r "/tmp/"$(basename "${url%.git}")""' ; \
-  echo 'done' ; \
   echo 'rm "${self}"' ; \
 ) | tee "${HOME}/.init.d/pacman" > /dev/null \
 && chmod +x "${HOME}/.init.d/pacman" \
