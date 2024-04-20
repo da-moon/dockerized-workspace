@@ -229,8 +229,6 @@ RUN \
     echo "alias gitlint='docker run -u \"\$(id -u):\$(id -g)\" -w \"/repo\" --rm -it --ulimit nofile=1024 -v \"\$(pwd):/repo\" \"jorisroovers/gitlint\"' ;" ; \
     echo "alias reveal-md='docker run --rm  -u \"\$(id -u):\$(id -g)\" -p \"1948:1948\" -p \"35729:35729\" -v \"\$(pwd):/slides\" \"webpronl/reveal-md:latest\" /slides --watch' ;" ; \
   ) | tee "/etc/profile.d/docker.sh" > /dev/null || exit 1 ;
-
-
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                      useful dev cli tools                │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -470,7 +468,7 @@ RUN du --human-readable --max-depth 1 "${HOME}" > /.rustup
 USER "root"
 # hadolint ignore=SC2016,DL3028
 RUN \
-  gem install --quiet --no-user-install "bundler" "serverspec" \
+  gem install --quiet --no-user-install "bundler" "serverspec"
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 install nodejs packages                  │
 #  ╰──────────────────────────────────────────────────────────╯
