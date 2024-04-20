@@ -1,4 +1,4 @@
-1# syntax = docker/dockerfile:labs
+# syntax = docker/dockerfile:labs
 # vim: filetype=dockerfile softtabstop=2 tabstop=2 shiftwidth=2 fileencoding=utf-8 expandtab
 # code: language=dockerfile insertSpaces=true tabSize=2
 # ────────────────────────────────────────────────────────────────────────────────
