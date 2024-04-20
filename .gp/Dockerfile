@@ -21,6 +21,10 @@ ARG CHAOTIC_AUR_KEY="3056513887B78AEB"
 #  │                   user and group setup                   │
 #  ╰──────────────────────────────────────────────────────────╯
 # hadolint ignore=SC2016
+ENV GO111MODULE="on"
+ENV CGO_ENABLED="0"
+ENV CGO_LDFLAGS="-s -w -extldflags '-static'"
+
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
@@ -93,6 +97,11 @@ RUN \
   --save "/etc/pacman.d/mirrorlist" > /dev/null 2>&1 \
   && pacman --quiet --noprogressbar -Syy --noconfirm --needed \
     "chaotic-aur/topgrade" \
+    "lua" "luajit" "luarocks" "ruby" \
+    "python" "python-pip" "python-setuptools" "python-pre-commit" "python-certifi" \
+    "go" \
+    "goreleaser" \
+    "mage" \
     "bottom" \
     "cocogitto" \
     "eva" \
@@ -154,26 +163,7 @@ RUN \
     "rclone" \
     "expac" \
     "bash-completion" \
-  && ( \
-    # we use this to update installed packages one time after container starts. this
-    # gets executed whe the first shell is opened. This approach is to make the
-    # docker images as small as possible since upgrading all packages creates large
-    # diffs and large image sizes
-    echo '[ ! -r "/.pacman-update" ] && ( sudo pacman --quiet --noprogressbar -Syyu --noconfirm && sudo touch "/.pacman-update" )' ; \
-    echo 'alias pacman="sudo pacman"' ; \
-  ) | tee "/etc/profile.d/pacman.sh" > /dev/null \
-  && ( \
-    echo 'set -euo pipefail ;' ; \
-    echo 'chmod 700 "${HOME}/.ssh" ;' ; \
-    echo '[ -r "${HOME}/.ssh/authorized_keys" ] && chmod 644 "${HOME}/.ssh/authorized_keys" ;' ; \
-    echo '[ -r "${HOME}/.ssh/known_hosts" ] && chmod 644 "${HOME}/.ssh/known_hosts" ;' ; \
-    echo '[ -r "${HOME}/.ssh/config" ] && chmod 644 "${HOME}/.ssh/config" ;' ; \
-    echo 'find "${HOME}/.ssh" -type f -name "id*" -exec chmod 600 {} \;' ; \
-    echo 'find "${HOME}/.ssh" -type f -name "id*.pub" -exec chmod 644 {} \;' ; \
-    echo 'exit 0 ;' ; \
-  ) | tee /usr/local/share/fix-ssh-permissions.sh > /dev/null \
-  && chmod +x /usr/local/share/fix-ssh-permissions.sh  \
-    && ! getent group "${USER}" > /dev/null \
+  && ! getent group "${USER}" > /dev/null \
   && groupadd --gid "${UID}" "${USER}" > /dev/null > /dev/null \
   && useradd \
   --no-log-init \
@@ -201,6 +191,42 @@ RUN \
   && usermod -aG wheel,root,sudo "${USER}" \
   # ─── ENSURE USER HOME HAS THE RIGHT OWNERSHIP ───────────────────────────────────
   && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}" -R \
+  && sudo -i -u "${USER}" \
+    bash -c 'curl -sSL https://install.python-poetry.org | python3 -' > /dev/null 2>&1 \
+  && ln -sf "${HOME}/.local/bin/poetry" "/usr/local/bin/poetry" \
+  && poetry --version > /dev/null 2>&1 \
+  && ( \
+  echo 'eval "$(poetry completions bash)" ;' ; \
+  ) | tee "/etc/profile.d/poetry.sh" > /dev/null || exit 1  \
+  && ( \
+    # we use this to update installed packages one time after container starts. this
+    # gets executed whe the first shell is opened. This approach is to make the
+    # docker images as small as possible since upgrading all packages creates large
+    # diffs and large image sizes
+    echo '[ ! -r "/.pacman-update" ] && ( sudo pacman --quiet --noprogressbar -Syyu --noconfirm && sudo touch "/.pacman-update" )' ; \
+    echo 'alias pacman="sudo pacman"' ; \
+  ) | tee "/etc/profile.d/pacman.sh" > /dev/null \
+  && go version > /dev/null 2>&1 \
+  &&  ( \
+  echo 'export PATH="${PATH}:$(go env GOPATH)/bin";' ; \
+  ) | tee "/etc/profile.d/go.sh" > /dev/null || exit 1 \
+  && gem --version > /dev/null 2>&1 \
+  && gem install --quiet --no-user-install "bundler" "serverspec" \
+  &&  ( \
+    echo 'export GEM_HOME="$(ruby -e "puts Gem.user_dir")";' ; \
+    echo 'export PATH="${PATH}:${GEM_HOME}/bin";' ; \
+  ) | tee "/etc/profile.d/ruby.sh" > /dev/null || exit 1 \
+  && ( \
+    echo 'set -euo pipefail ;' ; \
+    echo 'chmod 700 "${HOME}/.ssh" ;' ; \
+    echo '[ -r "${HOME}/.ssh/authorized_keys" ] && chmod 644 "${HOME}/.ssh/authorized_keys" ;' ; \
+    echo '[ -r "${HOME}/.ssh/known_hosts" ] && chmod 644 "${HOME}/.ssh/known_hosts" ;' ; \
+    echo '[ -r "${HOME}/.ssh/config" ] && chmod 644 "${HOME}/.ssh/config" ;' ; \
+    echo 'find "${HOME}/.ssh" -type f -name "id*" -exec chmod 600 {} \;' ; \
+    echo 'find "${HOME}/.ssh" -type f -name "id*.pub" -exec chmod 644 {} \;' ; \
+    echo 'exit 0 ;' ; \
+  ) | tee /usr/local/share/fix-ssh-permissions.sh > /dev/null \
+  && chmod +x /usr/local/share/fix-ssh-permissions.sh  \
   && compress-packages ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │              install core pakages from aur               │
@@ -285,7 +311,8 @@ RUN \
     && popd > /dev/null 2>&1 || exit 1 ; \
     rm -r "/tmp/"$(basename "${url%.git}")"" ; \
   done ; \
-  rm -rf "${HOME}/go/pkg/mod" ;
+  rm -rf "${HOME}/go/pkg/mod" \
+  && compress-packages ;
 RUN \
   ( \
     # ensures shell always has the latest gipod variables
@@ -446,8 +473,7 @@ RUN \
   echo 'rm "${self}" ;' ; \
 ) | tee "${HOME}/.init.d/pacman.sh" > /dev/null \
 && chmod +x "${HOME}/.init.d/pacman.sh" \
-&& chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/pacman.sh" \
-&& compress-packages ;
+&& chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/pacman.sh" ;
 
 USER "${USER}"
 SHELL ["/usr/bin/pwsh", "-NoLogo", "-Command"]
@@ -525,51 +551,14 @@ SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 #     upx "$(which "${BIN}")" ; \
 #   done ; < <(cat "${CARGO_HOME}/.crates2.json"  | jq -r ".installs | to_entries[].value.bins[]" | sort -u)
 # RUN du --human-readable --max-depth 1 "${HOME}" > /.rustup
-# #  ╭──────────────────────────────────────────────────────────╮
-# #  │                 install go packages                      │
-# #  ╰──────────────────────────────────────────────────────────╯
-# USER "root"
-# ENV GO111MODULE="on"
-# ENV CGO_ENABLED="0"
-# ENV CGO_LDFLAGS="-s -w -extldflags '-static'"
-# # hadolint ignore=SC2016,SC2076
-# RUN \
-#   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-#   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-#   pacman -Syy --noconfirm --needed "go" "goreleaser" "mage" > /dev/null 2>&1 \
-#   && go version > /dev/null 2>&1 \
-#   &&  ( \
-#   echo 'export PATH="${PATH}:$(go env GOPATH)/bin";' ; \
-#   ) | tee "/etc/profile.d/go.sh" > /dev/null || exit 1 ; \
-#   compress-packages ;
+
 # #  ╭──────────────────────────────────────────────────────────╮
 # #  │                 install lua packages                     │
 # #  ╰──────────────────────────────────────────────────────────╯
 # USER "root"
 # ENV PATH="${PATH}:${HOME}/.luarocks/bin"
 # # hadolint ignore=SC2016
-# RUN \
-#   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-#   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-#   pacman -Syy --noconfirm --needed "lua" "luajit" "luarocks" > /dev/null 2>&1 ; \
-#   compress-packages ;
-# #  ╭──────────────────────────────────────────────────────────╮
-# #  │                 install ruby packages                    │
-# #  ╰──────────────────────────────────────────────────────────╯
-# USER "root"
 # ENV GEM_PATH="${HOME}/.gem"
-# # hadolint ignore=SC2016,DL3028
-# RUN \
-#   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-#   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-#   pacman --quiet --noprogressbar -Syy --noconfirm --needed "ruby" \
-#   && gem --version > /dev/null 2>&1 \
-#   && gem install --quiet --no-user-install "bundler" "serverspec" \
-#   &&  ( \
-#     echo 'export GEM_HOME="$(ruby -e "puts Gem.user_dir")";' ; \
-#     echo 'export PATH="${PATH}:${GEM_HOME}/bin";' ; \
-#   ) | tee "/etc/profile.d/ruby.sh" > /dev/null || exit 1 ; \
-#   compress-packages ;
 # #  ╭──────────────────────────────────────────────────────────╮
 # #  │                     python packages                      │
 # #  ╰──────────────────────────────────────────────────────────╯
@@ -579,14 +568,7 @@ SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 # RUN \
 #   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
 #   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-#   pacman --quiet --noprogressbar -Syy --noconfirm --needed "python" "python-pip" "python-setuptools" "python-pre-commit" "python-certifi" \
-#   && sudo -i -u "${USER}" \
-#     bash -c 'curl -sSL https://install.python-poetry.org | python3 -' > /dev/null 2>&1 \
-#   && ln -sf "${HOME}/.local/bin/poetry" "/usr/local/bin/poetry" \
-#   && poetry --version > /dev/null 2>&1 \
-#   && ( \
-#   echo 'eval "$(poetry completions bash)" ;' ; \
-#   ) | tee "/etc/profile.d/poetry.sh" > /dev/null || exit 1 ; \
+
 #   compress-packages ;
 # #  ╭──────────────────────────────────────────────────────────╮
 # #  │                 install nodejs packages                  │
