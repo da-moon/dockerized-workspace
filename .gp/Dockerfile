@@ -303,6 +303,15 @@ RUN \
   #  ╰──────────────────────────────────────────────────────────╯
   node  --version >/dev/null 2>&1 && npm  --version >/dev/null 2>&1 && echo 'export PATH="$(npm -g bin):${PATH}" ;' > "/etc/profile.d/npm.sh" || exit 1 \
   yarn --version >/dev/null 2>&1 && echo 'export PATH="$(yarn global bin):${PATH}" ;' > "/etc/profile.d/yarn.sh" || exit 1 \
+  #  ╭──────────────────────────────────────────────────────────╮
+  #  │                 powershell init                          │
+  #  ╰──────────────────────────────────────────────────────────╯
+  pwsh --version && ( \
+      pwsh -c ' \
+      $parent=Split-Path -parent $PROFILE ; if (-not(Test-Path -Path $parent -PathType Container)) {$null = New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop} \
+      ' ; \
+    ) || exit 0 ; \
+  ) ; \
   # ─── USE DELTA FOR GIT DIFFS ────────────────────────────────────────────────────
   delta --version > /dev/null 2>&1 && ( \
     git config --system pager.diff delta \
