@@ -92,25 +92,68 @@ RUN \
   --sort rate \
   --save "/etc/pacman.d/mirrorlist" > /dev/null 2>&1 \
   && pacman --quiet --noprogressbar -Syy --noconfirm --needed \
-  "base-devel" \
-  "upx" \
-  "git" \
-  "sudo" \
-  "openssl" \
-  "openssh" \
-  "rsync" \
-  "man-db" \
-  "wget" \
-  "curl" \
-  "jq" \
-  "unzip" \
-  "unrar" \
-  "dialog" \
-  "psutils" \
-  "moreutils" \
-  "rclone" \
-  "expac" \
-  "bash-completion" \
+    "chaotic-aur/topgrade" \
+    "bottom" \
+    "cocogitto" \
+    "eva" \
+    "hck" \
+    "mdcat" \
+    "navi" \
+    "xh" \
+    "zellij" \
+    "zoxide" \
+    "xplr" \
+    "xcp" \
+    "neovim" \
+    "sd" \
+    "duf" \
+    "ncdu" \
+    "ripgrep" \
+    "ripgrep-all" \
+    "fd" \
+    "tokei" \
+    "hyperfine" \
+    "eza" \
+    "atuin" \
+    "bash-preexec" \
+    "bat" \
+    "bat-extras" \
+    "prettier" \
+    "rustfmt" \
+    "entr" \
+    "podman" \
+    "docker" \
+    "docker-buildx" \
+    "docker-machine" \
+    "docker-scan" \
+    "docker-compose" \
+    "noto-fonts" \
+    "ttf-ubuntu-font-family" \
+    "ttf-font-awesome" \
+    "fzf" \
+    "github-cli" \
+    "gitui" \
+    "git-delta" \
+    "difftastic" \
+    "base-devel" \
+    "upx" \
+    "git" \
+    "sudo" \
+    "openssl" \
+    "openssh" \
+    "rsync" \
+    "man-db" \
+    "wget" \
+    "curl" \
+    "jq" \
+    "unzip" \
+    "unrar" \
+    "dialog" \
+    "psutils" \
+    "moreutils" \
+    "rclone" \
+    "expac" \
+    "bash-completion" \
   && ( \
     # we use this to update installed packages one time after container starts. this
     # gets executed whe the first shell is opened. This approach is to make the
@@ -119,7 +162,18 @@ RUN \
     echo '[ ! -r "/.pacman-update" ] && ( sudo pacman --quiet --noprogressbar -Syyu --noconfirm && sudo touch "/.pacman-update" )' ; \
     echo 'alias pacman="sudo pacman"' ; \
   ) | tee "/etc/profile.d/pacman.sh" > /dev/null \
-  && ! getent group "${USER}" > /dev/null \
+  && ( \
+    echo 'set -euo pipefail ;' ; \
+    echo 'chmod 700 "${HOME}/.ssh" ;' ; \
+    echo '[ -r "${HOME}/.ssh/authorized_keys" ] && chmod 644 "${HOME}/.ssh/authorized_keys" ;' ; \
+    echo '[ -r "${HOME}/.ssh/known_hosts" ] && chmod 644 "${HOME}/.ssh/known_hosts" ;' ; \
+    echo '[ -r "${HOME}/.ssh/config" ] && chmod 644 "${HOME}/.ssh/config" ;' ; \
+    echo 'find "${HOME}/.ssh" -type f -name "id*" -exec chmod 600 {} \;' ; \
+    echo 'find "${HOME}/.ssh" -type f -name "id*.pub" -exec chmod 644 {} \;' ; \
+    echo 'exit 0 ;' ; \
+  ) | tee /usr/local/share/fix-ssh-permissions.sh > /dev/null \
+  && chmod +x /usr/local/share/fix-ssh-permissions.sh  \
+    && ! getent group "${USER}" > /dev/null \
   && groupadd --gid "${UID}" "${USER}" > /dev/null > /dev/null \
   && useradd \
   --no-log-init \
@@ -147,12 +201,7 @@ RUN \
   && usermod -aG wheel,root,sudo "${USER}" \
   # ─── ENSURE USER HOME HAS THE RIGHT OWNERSHIP ───────────────────────────────────
   && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}" -R \
-  && git --version > /dev/null 2>&1 && ( \
-    git config --system push.recurseSubmodules "on-demand" \
-    && git config --system diff.submodule "log" \
-    && git config --system status.submoduleSummary "true" \
-  ) || exit 1 ; \
-  compress-packages ;
+  && compress-packages ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │              install core pakages from aur               │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -174,7 +223,30 @@ RUN \
     for i in {1..5}; do makepkg -sicr --noconfirm && break || sleep 15; done ; \
     rm -r "/tmp/"$(basename "${url%.git}")"" \
     && popd > /dev/null 2>&1 || exit 1 ; \
-  done ; 
+  done ; \
+  ( \
+    echo '[ -r "/entrypoint" ] && exec /entrypoint bash --login' ; \
+  ) | tee "${HOME}/.bashrc" > /dev/null ; \
+  # ─── SSH SETUP ──────────────────────────────────────────────────────────────────
+  mkdir -p "${HOME}/.ssh" \
+  && chmod 700 "${HOME}/.ssh" \
+  && ( \
+  echo "Host git.sr.ht" ; \
+  echo "  User git" ; \
+  echo "  StrictHostKeyChecking no" ; \
+  echo "  MACs hmac-sha2-512" ; \
+  echo "  UserKnownHostsFile=/dev/null" ; \
+  echo "  IdentityFile=~/.ssh/id_rsa_sourcehut" ; \
+  echo "Host mpr" ; \
+  echo "  HostName mpr.hunterwittenborn.com" ; \
+  echo "  IdentityFile ~/.ssh/id_rsa_makedeb" ; \
+  echo "  User mpr" ; \
+  echo "  IdentitiesOnly yes" ; \
+  echo "  StrictHostKeyChecking no" ; \
+  echo "  MACs hmac-sha2-512" ; \
+  echo "  UserKnownHostsFile=/dev/null" ; \
+  ) | tee "${HOME}/.ssh/config" > /dev/null \
+  && chmod 644 "${HOME}/.ssh/config" ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                          dev tools                       │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -205,50 +277,6 @@ RUN \
   "https://aur.archlinux.org/vendir-bin.git" \
   "https://aur.archlinux.org/qsv-bin.git" \
   ) ; \
-  pacman --quiet --noprogressbar -Syy --noconfirm --needed \
-    "chaotic-aur/topgrade" \
-    "bottom" \
-    "cocogitto" \
-    "eva" \
-    "hck" \
-    "mdcat" \
-    "navi" \
-    "xh" \
-    "zellij" \
-    "zoxide" \
-    "xplr" \
-    "xcp" \
-    "neovim" \
-    "sd" \
-    "duf" \
-    "ncdu" \
-    "ripgrep" \
-    "ripgrep-all" \
-    "fd" \
-    "tokei" \
-    "hyperfine" \
-    "eza" \
-    "atuin" \
-    "bash-preexec" \
-    "bat" \
-    "bat-extras" \
-    "prettier" \
-    "rustfmt" \
-    "entr" ; \
-    "podman" \
-    "docker" \
-    "docker-buildx" \
-    "docker-machine" \
-    "docker-scan" \
-    "docker-compose" \
-    "noto-fonts" \
-    "ttf-ubuntu-font-family" \
-    "ttf-font-awesome" \
-    "fzf" \
-    "github-cli" \
-    "gitui" \
-    "git-delta" \
-    "difftastic" ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
     git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
     && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
@@ -257,7 +285,8 @@ RUN \
     && popd > /dev/null 2>&1 || exit 1 ; \
     rm -r "/tmp/"$(basename "${url%.git}")"" ; \
   done ; \
-  rm -rf "${HOME}/go/pkg/mod" ; \
+  rm -rf "${HOME}/go/pkg/mod" ;
+RUN \
   ( \
     # ensures shell always has the latest gipod variables
     echo 'if gp version > /dev/null 2>&1 ; then' ;\
@@ -379,7 +408,47 @@ RUN \
     echo '[ ! -d "${HOME}/.config/xplr" ] && mkdir -p "${HOME}/.config/xplr" ;' ; \
     echo 'wget -qO "${HOME}/.config/xplr/init.lua" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/xplr/init.lua" ;' ; \
   ) | tee "/etc/profile.d/xplr.sh" > /dev/null  || exit 1 ; \
-  compress-packages ;
+  git --version > /dev/null 2>&1 && ( \
+    git config --system push.recurseSubmodules "on-demand" \
+    && git config --system diff.submodule "log" \
+    && git config --system status.submoduleSummary "true" \
+  ) || exit 1 \
+  && ( \
+    echo '#!/bin/sh' ; \
+    echo '[ -r "/usr/local/share/docker-from-docker.sh" ] && bash "/usr/local/share/docker-from-docker.sh" ;' ; \
+    echo '[ -r "/usr/local/share/kary-comments.sh" ] && bash "/usr/local/share/kary-comments.sh" ;' ; \
+    echo '[ -r "/usr/local/share/fix-ssh-permissions.sh" ] && bash "/usr/local/share/fix-ssh-permissions.sh" ;' ; \
+    echo '[ -d "${HOME}/.init.d" ] && (' ; \
+    echo '  find "${HOME}/.init.d" -type f -name "*.sh" | xargs -r -I {} -P "$(nproc)" bash "{}" ;' ; \
+    echo ');' ; \
+    echo 'exec "$@"' ; \
+  ) | tee '/entrypoint' > /dev/null \
+  && chmod +x '/entrypoint' \
+  && chown "$(id -u "${USER}"):$(id -g "${USER}")" '/entrypoint'; \
+  [ ! -d "${HOME}/.init.d/" ] && ( mkdir "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
+( \
+  #  ╭──────────────────────────────────────────────────────────╮
+  #  │                   package manager                        │
+  #  ╰──────────────────────────────────────────────────────────╯
+  # NOTE: updating packages and installing large packages when gitpod container launches.
+  # This is to minimize the image size during build time as large
+  # images can lead to Gitpod build timing out
+  echo '#!/usr/bin/env bash' \
+  echo 'self="$(realpath -s "${BASH_SOURCE[0]}")";' \
+  echo '[ ! -r "/.pacman-bootstrap" ] &&' \
+  echo '{' \
+  echo '  sudo pacman --quiet --noprogressbar -Syyu --noconfirm ;' \
+  echo '  sudo pacman --quiet --noprogressbar -Syy --noconfirm --needed \' \
+  echo '    "azure-cli" \' \
+  echo '    "chaotic-aur/google-cloud-cli" ;' \
+  echo '  sudo touch "/.pacman-bootstrap" ;' \
+  echo '};' \
+  echo 'rm "${self}" ;' ; \
+) | tee "${HOME}/.init.d/pacman.sh" > /dev/null \
+&& chmod +x "${HOME}/.init.d/pacman.sh" \
+&& chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/pacman.sh" \
+&& compress-packages ;
+
 USER "${USER}"
 SHELL ["/usr/bin/pwsh", "-NoLogo", "-Command"]
 RUN $parent=Split-Path -parent $PROFILE ; if (-not(Test-Path -Path $parent -PathType Container)) {$null = New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop}
@@ -840,76 +909,21 @@ SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 # # # hadolint ignore=DL4006
 # # RUN 'driftctl completion powershell | Out-String | Invoke-Expression' | Out-File -Append -Encoding ascii "$PROFILE"
 # # SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                   package manager                        │
-#  ╰──────────────────────────────────────────────────────────╯
-# NOTE: updating packages and installing large packages when gitpod container launches.
-# This is to minimize the image size during build time as large
-# images can lead to Gitpod build timing out
 # hadolint ignore=SC2016
-RUN \
-[ ! -d "${HOME}/.init.d/" ] && ( mkdir "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
-( \
-  echo '#!/usr/bin/env bash' \
-  echo 'self="$(realpath -s "${BASH_SOURCE[0]}")";' \
-  echo '[ ! -r "/.pacman-bootstrap" ] &&' \
-  echo '{' \
-  echo '  sudo pacman --quiet --noprogressbar -Syyu --noconfirm ;' \
-  echo '  sudo pacman --quiet --noprogressbar -Syy --noconfirm --needed \' \
-  echo '    "azure-cli" \' \
-  echo '    "chaotic-aur/google-cloud-cli" ;' \
-  echo '  sudo touch "/.pacman-bootstrap" ;' \
-  echo '};' \
-  echo 'rm "${self}" ;' ; \
-) | tee "${HOME}/.init.d/pacman.sh" > /dev/null \
-&& chmod +x "${HOME}/.init.d/pacman.sh" \
-&& chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/pacman.sh" \
+
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                   user profile config                    │
 #  ╰──────────────────────────────────────────────────────────╯
 USER "${USER}"
 WORKDIR "${WORKDIR}"
 RUN \
-  ( \
-    echo '[ -r "/entrypoint" ] && exec /entrypoint bash --login' ; \
-  ) | tee "${HOME}/.bashrc" > /dev/null ; \
-  # ─── SSH SETUP ──────────────────────────────────────────────────────────────────
-  mkdir -p "${HOME}/.ssh" \
-  && chmod 700 "${HOME}/.ssh" \
-  && ( \
-  echo "Host git.sr.ht" ; \
-  echo "  User git" ; \
-  echo "  StrictHostKeyChecking no" ; \
-  echo "  MACs hmac-sha2-512" ; \
-  echo "  UserKnownHostsFile=/dev/null" ; \
-  echo "  IdentityFile=~/.ssh/id_rsa_sourcehut" ; \
-  echo "Host mpr" ; \
-  echo "  HostName mpr.hunterwittenborn.com" ; \
-  echo "  IdentityFile ~/.ssh/id_rsa_makedeb" ; \
-  echo "  User mpr" ; \
-  echo "  IdentitiesOnly yes" ; \
-  echo "  StrictHostKeyChecking no" ; \
-  echo "  MACs hmac-sha2-512" ; \
-  echo "  UserKnownHostsFile=/dev/null" ; \
-  ) | tee "${HOME}/.ssh/config" > /dev/null \
-  && chmod 644 "${HOME}/.ssh/config" ;
+
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                         finalize                         │
 #  ╰──────────────────────────────────────────────────────────╯
 USER "root"
 # hadolint ignore=SC2016
-RUN \
-( \
-  echo 'set -euo pipefail ;' ; \
-  echo 'chmod 700 "${HOME}/.ssh" ;' ; \
-  echo '[ -r "${HOME}/.ssh/authorized_keys" ] && chmod 644 "${HOME}/.ssh/authorized_keys" ;' ; \
-  echo '[ -r "${HOME}/.ssh/known_hosts" ] && chmod 644 "${HOME}/.ssh/known_hosts" ;' ; \
-  echo '[ -r "${HOME}/.ssh/config" ] && chmod 644 "${HOME}/.ssh/config" ;' ; \
-  echo 'find "${HOME}/.ssh" -type f -name "id*" -exec chmod 600 {} \;' ; \
-  echo 'find "${HOME}/.ssh" -type f -name "id*.pub" -exec chmod 644 {} \;' ; \
-  echo 'exit 0 ;' ; \
-) | tee /usr/local/share/fix-ssh-permissions.sh > /dev/null \
-&& chmod +x /usr/local/share/fix-ssh-permissions.sh  ;
+
 # hadolint ignore=SC2016,SC2046
 RUN \
   ln -sf "/usr/share/zoneinfo/America/New_York" "/etc/localtime" ; \
@@ -991,20 +1005,6 @@ RUN \
 #  │                    Entrypoint script                     │
 #  ╰──────────────────────────────────────────────────────────╯
 # hadolint ignore=SC2016
-RUN \
-  ( \
-    echo '#!/bin/sh' ; \
-    echo '[ -r "/usr/local/share/docker-from-docker.sh" ] && bash "/usr/local/share/docker-from-docker.sh" ;' ; \
-    echo '[ -r "/usr/local/share/kary-comments.sh" ] && bash "/usr/local/share/kary-comments.sh" ;' ; \
-    echo '[ -r "/usr/local/share/fix-ssh-permissions.sh" ] && bash "/usr/local/share/fix-ssh-permissions.sh" ;' ; \
-    echo '[ -d "${HOME}/.init.d" ] && (' ; \
-    echo '  find "${HOME}/.init.d" -type f -name "*.sh" | xargs -r -I {} -P "$(nproc)" bash "{}" ;' ; \
-    echo ');' ; \
-    echo 'exec "$@"' ; \
-  ) | tee '/entrypoint' > /dev/null \
-  && chmod +x '/entrypoint' \
-  && chown "$(id -u "${USER}"):$(id -g "${USER}")" '/entrypoint';
-
 RUN \
 du --human-readable --max-depth 1 "${HOME}" > /.size \
 && expac --humansize M "%n %m" -l'\n' -Q "$(pacman -Qq)" | sort -hk 2 > /.package-size
