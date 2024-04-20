@@ -1,4 +1,4 @@
-# syntax = docker/dockerfile:labs
+1# syntax = docker/dockerfile:labs
 # vim: filetype=dockerfile softtabstop=2 tabstop=2 shiftwidth=2 fileencoding=utf-8 expandtab
 # code: language=dockerfile insertSpaces=true tabSize=2
 # ────────────────────────────────────────────────────────────────────────────────
@@ -461,6 +461,7 @@ RUN \
   echo '[[ -n ${BASH} ]] && complete -F _fzf_complete_make -o default -o bashdefault make' ; \
   echo '[ -r "/usr/share/fzf/key-bindings.bash" ] && source "/usr/share/fzf/key-bindings.bash"' ; \
   echo '[ -r "/usr/share/fzf/completion.bash" ] && source "/usr/share/fzf/completion.bash"' ; \
+  echo '[ -r "/usr/share/fzf/fzf-extras.bash" ] && source "/usr/share/fzf/fzf-extras.bash"' ; \
   ) | tee "/etc/profile.d/fzf.sh" > /dev/null || exit 1 ; \
   ( \
   echo 'if hx --version > /dev/null 2>&1 ; then' ;\
@@ -476,6 +477,7 @@ RUN \
   echo '  eval "$(gp env --export)" ;' ;\
   echo 'fi' ;\
   ) | tee "/etc/profile.d/gitpod.sh" > /dev/null || exit 1 ; \
+  echo '[ -r "${HOME}/.local/share/bash-completion/completions/git-forgit.bash" ] && source "${HOME}/.local/share/bash-completion/completions/git-forgit.bash"' > "/etc/profile.d/forgit.sh" > /dev/null || exit 1 ; \
   compress-packages ;
 USER "${USER}"
 SHELL ["/usr/bin/pwsh", "-NoLogo", "-Command"]
@@ -928,12 +930,12 @@ RUN \
   echo '      "marksman" \' ; \
   echo '      "cfssl" \' ; \
   echo '  && curl -fsSL "https://plandex.ai/install.sh" | bash > /dev/null 2>&1 \' ; \
-  echo '  && sudo touch "/.extra-pkgs"' ; \
-  echo ')' ; \
-  echo 'rm "${self}"' ; \
-  ) | tee "${HOME}/.init.d/pacman" > /dev/null \
-  && chmod +x "${HOME}/.init.d/pacman" \
-  && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/pacman" ;
+  echo '  && sudo touch "/.extra-pkgs" ;' ; \
+  echo ') \' ; \
+  echo ' && rm "${self}"' ; \
+  ) | tee "${HOME}/.init.d/pacman.sh" > /dev/null \
+  && chmod +x "${HOME}/.init.d/pacman.sh" \
+  && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/pacman.sh" ;
 
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                   user profile config                    │
