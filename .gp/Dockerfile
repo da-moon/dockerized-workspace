@@ -239,12 +239,29 @@ ENV COLORTERM="truecolor"
 ENV EDITOR="hx"
 ENV VISUAL="hx"
 ENV _ZO_DATA_DIR="/workspace/zoxide/"
+ENV GEM_PATH="${HOME}/.gem"
+ENV GO111MODULE="on"
+ENV CGO_ENABLED="0"
+ENV CGO_LDFLAGS="-s -w -extldflags '-static'"
+ENV PATH="${PATH}:${HOME}/.local/bin"
+ENV PATH="${PATH}:${HOME}/.luarocks/bin"
 # hadolint ignore=SC2016
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   pacman --quiet -S --noconfirm --needed \
     "chaotic-aur/powershell-bin" \
+    "go" \
+    "lua" \
+    "luajit" \
+    "luarocks" \
+    "python" \
+    "python-pip" \
+    "python-setuptools" \
+    "ruby" \
+    "nodejs" \
+    "npm" \
+    "yarn" \
     "starship" \
     "fzf" \
     "github-cli" \
@@ -261,6 +278,33 @@ RUN \
     "just" \
     "make" \
     "go-task" ; \
+  #  ╭──────────────────────────────────────────────────────────╮
+  #  │                     go setup                             │
+  #  ╰──────────────────────────────────────────────────────────╯
+  go version > /dev/null 2>&1 && ( \
+    echo 'export PATH="${PATH}:$(go env GOPATH)/bin";' ; \
+  ) | tee "/etc/profile.d/go.sh" > /dev/null || exit 1 ; \
+  #  ╭──────────────────────────────────────────────────────────╮
+  #  │                     ruby setup                           │
+  #  ╰──────────────────────────────────────────────────────────╯
+  gem --version > /dev/null 2>&1 && ( \
+    echo 'export GEM_HOME="$(ruby -e "puts Gem.user_dir")";' ; \
+    echo 'export PATH="${PATH}:${GEM_HOME}/bin";' ; \
+  ) | tee "/etc/profile.d/ruby.sh" > /dev/null || exit 1 ; \
+  #  ╭──────────────────────────────────────────────────────────╮
+  #  │                     python setup                         │
+  #  ╰──────────────────────────────────────────────────────────╯  
+  sudo -i -u "${USER}" \
+    bash -c 'curl -sSL https://install.python-poetry.org | python3 -' > /dev/null 2>&1 \
+  && ln -sf "${HOME}/.local/bin/poetry" "/usr/local/bin/poetry" \
+  && poetry --version > /dev/null 2>&1 && ( \
+    echo 'eval "$(poetry completions bash)" ;' ; \
+  ) | tee "/etc/profile.d/poetry.sh" > /dev/null || exit 1 ; \
+  #  ╭──────────────────────────────────────────────────────────╮
+  #  │                 nodejs setup                             │
+  #  ╰──────────────────────────────────────────────────────────╯
+  node  --version >/dev/null 2>&1 && npm  --version >/dev/null 2>&1 && echo 'export PATH="$(npm -g bin):${PATH}" ;' > "/etc/profile.d/npm.sh" || exit 1 \
+  yarn --version >/dev/null 2>&1 && echo 'export PATH="$(yarn global bin):${PATH}" ;' > "/etc/profile.d/yarn.sh" || exit 1 \
   # ─── USE DELTA FOR GIT DIFFS ────────────────────────────────────────────────────
   delta --version > /dev/null 2>&1 && ( \
     git config --system pager.diff delta \
@@ -420,9 +464,6 @@ RUN \
     upx "$(which "${BIN}")" ; \
   done ; < <(cat "${CARGO_HOME}/.crates2.json"  | jq -r ".installs | to_entries[].value.bins[]" | sort -u)
 RUN du --human-readable --max-depth 1 "${HOME}" > /.rustup
-
-USER "root"
-
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 install ruby packages                    │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -430,47 +471,6 @@ USER "root"
 # hadolint ignore=SC2016,DL3028
 RUN \
   gem install --quiet --no-user-install "bundler" "serverspec" \
-
-  ENV PATH="${PATH}:${HOME}/.local/bin"
-  ENV GEM_PATH="${HOME}/.gem"
-  ENV PATH="${PATH}:${HOME}/.luarocks/bin"
-  ENV GO111MODULE="on"
-  ENV CGO_ENABLED="0"
-  ENV CGO_LDFLAGS="-s -w -extldflags '-static'"
-
-  pacman -S --noconfirm --needed "lua" "luajit" "luarocks" > /dev/null 2>&1 ; \
-  #  ╭──────────────────────────────────────────────────────────╮
-  #  │                     go setup                             │
-  #  ╰──────────────────────────────────────────────────────────╯
-  pacman -S --noconfirm --needed "go" > /dev/null 2>&1 \
-  && go version > /dev/null 2>&1 && ( \
-    echo 'export PATH="${PATH}:$(go env GOPATH)/bin";' ; \
-  ) | tee "/etc/profile.d/go.sh" > /dev/null || exit 1 ; \
-  #  ╭──────────────────────────────────────────────────────────╮
-  #  │                     ruby setup                           │
-  #  ╰──────────────────────────────────────────────────────────╯
-  pacman --quiet --noprogressbar -S --noconfirm --needed "ruby" \
-  && gem --version > /dev/null 2>&1 && ( \
-    echo 'export GEM_HOME="$(ruby -e "puts Gem.user_dir")";' ; \
-    echo 'export PATH="${PATH}:${GEM_HOME}/bin";' ; \
-  ) | tee "/etc/profile.d/ruby.sh" > /dev/null || exit 1 ; \
-  #  ╭──────────────────────────────────────────────────────────╮
-  #  │                     python setup                         │
-  #  ╰──────────────────────────────────────────────────────────╯  
-  pacman --quiet --noprogressbar -S --noconfirm --needed "python" "python-pip" "python-setuptools" \
-  && sudo -i -u "${USER}" \
-    bash -c 'curl -sSL https://install.python-poetry.org | python3 -' > /dev/null 2>&1 \
-  && ln -sf "${HOME}/.local/bin/poetry" "/usr/local/bin/poetry" \
-  && poetry --version > /dev/null 2>&1 && ( \
-    echo 'eval "$(poetry completions bash)" ;' ; \
-  ) | tee "/etc/profile.d/poetry.sh" > /dev/null || exit 1 ; \
-  #  ╭──────────────────────────────────────────────────────────╮
-  #  │                 nodejs setup                             │
-  #  ╰──────────────────────────────────────────────────────────╯
-  pacman --quiet --noprogressbar -S --noconfirm --needed "nodejs" "npm" "yarn" \
-  && node  --version >/dev/null 2>&1 && npm  --version >/dev/null 2>&1 && echo 'export PATH="$(npm -g bin):${PATH}" ;' > "/etc/profile.d/npm.sh" || exit 1 \
-  && yarn --version >/dev/null 2>&1 && echo 'export PATH="$(yarn global bin):${PATH}" ;' > "/etc/profile.d/yarn.sh" || exit 1 \
-
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 install nodejs packages                  │
 #  ╰──────────────────────────────────────────────────────────╯
