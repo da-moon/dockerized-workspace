@@ -820,8 +820,8 @@ RUN \
   echo 'export CGO_LDFLAGS="-g -O2"' ; \
   echo 'self="$(realpath -s "${BASH_SOURCE[0]}")"' ; \
   echo '[ ! -r "/.extra-pkgs" ] && (' ; \
-  echo '  sudo pacman --quiet --noprogressbar -Syyu --noconfirm \' ; \
-  echo '  && paru --quiet --noprogressbar -S --noconfirm --needed --removemake --cleanafter \' ; \
+  echo '  sudo pacman -Syyu --noconfirm \' ; \
+  echo '  && paru -S --noconfirm --needed --removemake --cleanafter \' ; \
   echo '      "aur/ttdl" \' ; \
   echo '      "aur/devc-bin" \' ; \
   echo '      "aur/nodejs-cspell" \' ; \
