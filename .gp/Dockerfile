@@ -8,39 +8,61 @@
 # hadolint ignore=DL3007
 FROM archlinux:latest
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
-# USER "root"
 USER root
 ENV USER="gitpod"
 ENV UID="33333"
 ENV HOME="/home/${USER}"
 ARG WORKDIR="/workspace"
 ENV WORKDIR "${WORKDIR}"
-
+# ────────────────────────────────────────────────────────────
+ARG CHAOTIC_AUR_KEY="3056513887B78AEB"
+# ────────────────────────────────────────────────────────────
 #  ╭──────────────────────────────────────────────────────────╮
-#  │                      initial setup                       │
+#  │                   user and group setup                   │
 #  ╰──────────────────────────────────────────────────────────╯
 # hadolint ignore=SC2016
 RUN \
-sed \
-  -e '/XDG_/d' \
-  -e '$aXDG_CACHE_HOME  DEFAULT=@{WORKDIR}/.cache' \
-  -e '$aXDG_CONFIG_HOME DEFAULT=@{WORKDIR}/.config' \
-  -e '$aXDG_DATA_HOME   DEFAULT=@{WORKDIR}/.local/share' \
-  -e '$aXDG_STATE_HOME  DEFAULT=@{WORKDIR}/.local/state' \
-  "/etc/security/pam_env.conf" ;
-# hadolint ignore=DL3059
-RUN \
-  # ─── DOWNLOAD SIXTEEN PACKAGES CONCURRENTLY ─────────────────────────────────────
-  sed -i \
+  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
+  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
+  (\
+    echo 'SKIP_PKGS=(); \' ; \
+    echo 'if [ -r "/tmp/.processed-pkgs" ]; then \' ; \
+    echo '  readarray -t SKIP_PKGS < "/tmp/.processed-pkgs" ; \' ; \
+    echo 'fi ; \' ; \
+    echo 'SKIP_PKGS+=("upx" "sudo"); \' ; \
+    echo 'PKGS=($(comm -2 -3 <(pacman -Qe | awk "{print \$1}"| sort)  <(printf "%s\n" "${SKIP_PKGS[@]}" | sort) )) ; \' ; \
+    echo 'BIN_LIST=() ; \' ; \
+    echo 'for pkg in "${PKGS[@]}";do \' ; \
+    echo '  if [[ ! " ${SKIP_PKGS[*]} " =~ " ${pkg} " ]]; then \' ; \
+    echo '    SKIP_PKGS+=("${pkg}"); \' ; \
+    echo '  fi ; \' ; \
+    echo '  for f in $(pacman -Qql "${pkg}"); do \' ; \
+    echo '    [ ! -d "${f}" ] && [ -x "${f}" ] \' ; \
+    echo '    && file -i "${f}" | grep -q -E "application/x-(pie-)?executable; charset=binary" \' ; \
+    echo '    && BIN_LIST+=("${f}"); \' ; \
+    echo '  done ; \' ; \
+    echo 'done ; \' ; \
+    echo 'printf "%s\n" "${BIN_LIST[@]}" | xargs -r -I {} -P "$(($(nproc)/4))" bash -c "upx -q \"{}\" || echo \"{}\" > /tmp/.failed-compress" ; \' ; \
+    echo 'printf "%s\n" "${SKIP_PKGS[@]}" | tee "/tmp/.processed-pkgs" > /dev/null ;' ; \
+  ) | tee "/usr/local/bin/compress-packages" > /dev/null \
+  && chmod +x "/usr/local/bin/compress-packages" \
+  && sed \
+    -e '/XDG_/d' \
+    -e '$aXDG_CACHE_HOME  DEFAULT=@{WORKDIR}/.cache' \
+    -e '$aXDG_CONFIG_HOME DEFAULT=@{WORKDIR}/.config' \
+    -e '$aXDG_DATA_HOME   DEFAULT=@{WORKDIR}/.local/share' \
+    -e '$aXDG_STATE_HOME  DEFAULT=@{WORKDIR}/.local/state' \
+    "/etc/security/pam_env.conf" \
+  && sed -i \
   -e "/ParallelDownloads/d" \
   -e  '/\[options\]/a ParallelDownloads = 16' \
   "/etc/pacman.conf" \
   # ─── USE PACMAN AVATAR FOR SHOWING PROGRESS ─────────────────────────────────────
   && sed -i \
-  -e "/Color/d" \
-  -e "/ILoveCandy/d" \
-  -e '/\[options\]/a Color' \
-  -e '/\[options\]/a ILoveCandy' \
+    -e "/Color/d" \
+    -e "/ILoveCandy/d" \
+    -e '/\[options\]/a Color' \
+    -e '/\[options\]/a ILoveCandy' \
   "/etc/pacman.conf" \
   # https://www.reddit.com/r/archlinux/comments/3ctiou/lpt_speed_up_makepkg_by_skippingparallelizing/
   && sed -i \
@@ -52,12 +74,8 @@ RUN \
     -e "s/PKGEXT.*/PKGEXT='.pkg.tar'/g" \
     "/etc/makepkg.conf" \
   && pacman-key --init > /dev/null 2>&1 \
-  && pacman-key --populate "archlinux" > /dev/null 2>&1 ;
-# ────────────────────────────────────────────────────────────
-ARG CHAOTIC_AUR_KEY="3056513887B78AEB"
-# Chaotic-AUR
-RUN \
-  pacman-key --recv-key "${CHAOTIC_AUR_KEY}" --keyserver "keyserver.ubuntu.com" > /dev/null 2>&1 \
+  && pacman-key --populate "archlinux" > /dev/null 2>&1 \
+  && pacman-key --recv-key "${CHAOTIC_AUR_KEY}" --keyserver "keyserver.ubuntu.com" > /dev/null 2>&1 \
   && pacman-key --lsign-key "${CHAOTIC_AUR_KEY}" > /dev/null 2>&1 \
   && pacman -U --noprogressbar --noconfirm \
     'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' \
@@ -65,39 +83,42 @@ RUN \
   && ( \
     echo '[chaotic-aur]' ; \
     echo 'Include = /etc/pacman.d/chaotic-mirrorlist' ; \
-  ) | tee -a "/etc/pacman.conf" > /dev/null ;
-# ────────────────────────────────────────────────────────────
-RUN \
-  ( \
+  ) | tee -a "/etc/pacman.conf" > /dev/null \
+  && pacman --quiet --noprogressbar -Syy --noconfirm --needed "reflector" \
+  && reflector \
+  --verbose \
+  -p https \
+  --latest 5 \
+  --sort rate \
+  --save "/etc/pacman.d/mirrorlist" > /dev/null 2>&1 \
+  && pacman --quiet --noprogressbar -Syy --noconfirm --needed \
+  "base-devel" \
+  "upx" \
+  "git" \
+  "sudo" \
+  "openssl" \
+  "openssh" \
+  "rsync" \
+  "man-db" \
+  "wget" \
+  "curl" \
+  "jq" \
+  "unzip" \
+  "unrar" \
+  "dialog" \
+  "psutils" \
+  "moreutils" \
+  "rclone" \
+  "expac" \
+  "bash-completion" \
+  && ( \
     # we use this to update installed packages one time after container starts. this
     # gets executed whe the first shell is opened. This approach is to make the
     # docker images as small as possible since upgrading all packages creates large
     # diffs and large image sizes
     echo '[ ! -r "/.pacman-update" ] && ( sudo pacman --quiet --noprogressbar -Syyu --noconfirm && sudo touch "/.pacman-update" )' ; \
     echo 'alias pacman="sudo pacman"' ; \
-  ) | tee "/etc/profile.d/pacman.sh" > /dev/null ;
-
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                 finding fastest sources                  │
-#  ╰──────────────────────────────────────────────────────────╯
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet --noprogressbar -Syy --noconfirm --needed "reflector" \
-  && reflector \
-  --verbose \
-  -p https \
-  --latest 5 \
-  --sort rate \
-  --save "/etc/pacman.d/mirrorlist" > /dev/null 2>&1
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                   user and group setup                   │
-#  ╰──────────────────────────────────────────────────────────╯
-# hadolint ignore=SC2016
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet --noprogressbar -Syy --noconfirm --needed "sudo" "openssl" \
+  ) | tee "/etc/profile.d/pacman.sh" > /dev/null \
   && ! getent group "${USER}" > /dev/null \
   && groupadd --gid "${UID}" "${USER}" > /dev/null > /dev/null \
   && useradd \
@@ -125,66 +146,12 @@ RUN \
   # ─── UPDATE USER GROUP MEMBERSHIP ───────────────────────────────────────────────
   && usermod -aG wheel,root,sudo "${USER}" \
   # ─── ENSURE USER HOME HAS THE RIGHT OWNERSHIP ───────────────────────────────────
-  && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}" -R
-
-#  ╭──────────────────────────────────────────────────────────╮
-#  │              install makepkg dependencies                │
-#  ╰──────────────────────────────────────────────────────────╯
-RUN \
-(\
-  echo 'SKIP_PKGS=(); \' ; \
-  echo 'if [ -r "/tmp/.processed-pkgs" ]; then \' ; \
-  echo '  readarray -t SKIP_PKGS < "/tmp/.processed-pkgs" ; \' ; \
-  echo 'fi ; \' ; \
-  echo 'SKIP_PKGS+=("upx" "sudo"); \' ; \
-  echo 'PKGS=($(comm -2 -3 <(pacman -Qe | awk "{print \$1}"| sort)  <(printf "%s\n" "${SKIP_PKGS[@]}" | sort) )) ; \' ; \
-  echo 'BIN_LIST=() ; \' ; \
-  echo 'for pkg in "${PKGS[@]}";do \' ; \
-  echo '  if [[ ! " ${SKIP_PKGS[*]} " =~ " ${pkg} " ]]; then \' ; \
-  echo '    SKIP_PKGS+=("${pkg}"); \' ; \
-  echo '  fi ; \' ; \
-  echo '  for f in $(pacman -Qql "${pkg}"); do \' ; \
-  echo '    [ ! -d "${f}" ] && [ -x "${f}" ] \' ; \
-  echo '    && file -i "${f}" | grep -q -E "application/x-(pie-)?executable; charset=binary" \' ; \
-  echo '    && BIN_LIST+=("${f}"); \' ; \
-  echo '  done ; \' ; \
-  echo 'done ; \' ; \
-  echo 'printf "%s\n" "${BIN_LIST[@]}" | xargs -r -I {} -P "$(($(nproc)/4))" bash -c "upx -q \"{}\" || echo \"{}\" > /tmp/.failed-compress" ; \' ; \
-  echo 'printf "%s\n" "${SKIP_PKGS[@]}" | tee "/tmp/.processed-pkgs" > /dev/null ;' ; \
-) | tee "/usr/local/bin/compress-packages" > /dev/null \
-&& chmod +x "/usr/local/bin/compress-packages" ;
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet --noprogressbar -Syy --noconfirm --needed "base-devel" "upx" "git" \
-  # ─── BASE GIT CONFIGS ───────────────────────────────────────────────────────────
+  && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}" -R \
   && git --version > /dev/null 2>&1 && ( \
-  git config --system push.recurseSubmodules "on-demand" \
-  && git config --system diff.submodule "log" \
-  && git config --system status.submoduleSummary "true" \
+    git config --system push.recurseSubmodules "on-demand" \
+    && git config --system diff.submodule "log" \
+    && git config --system status.submoduleSummary "true" \
   ) || exit 1 ; \
-  compress-packages ;
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                    install core tools                    │
-#  ╰──────────────────────────────────────────────────────────╯
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet --noprogressbar -Syy --noconfirm --needed \
-  "openssh" \
-  "rsync" \
-  "man-db" \
-  "wget" \
-  "curl" \
-  "jq" \
-  "unzip" \
-  "unrar" \
-  "dialog" \
-  "psutils" \
-  "moreutils" \
-  "rclone" \
-  "expac" \
-  "bash-completion" ; \
   compress-packages ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │              install core pakages from aur               │
@@ -208,8 +175,6 @@ RUN \
     rm -r "/tmp/"$(basename "${url%.git}")"" \
     && popd > /dev/null 2>&1 || exit 1 ; \
   done ; 
-# hadolint ignore=SC2016
-RUN \
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                          dev tools                       │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -299,7 +264,7 @@ RUN \
     echo '  eval "$(gp env --export)" ;' ;\
     echo 'fi' ;\
   ) | tee "/etc/profile.d/gitpod.sh" > /dev/null || exit 1 \
-  ( \
+  && ( \
     echo '#!/bin/sh' ; \
     echo 'sudoIf() { if [ "$(id -u)" -ne 0 ]; then sudo "$@"; else "$@"; fi }' ; \
     # ─── DOCKER FROM DOCKER ─────────────────────────────────────────────────────────
@@ -881,6 +846,7 @@ SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 # NOTE: updating packages and installing large packages when gitpod container launches.
 # This is to minimize the image size during build time as large
 # images can lead to Gitpod build timing out
+# hadolint ignore=SC2016
 RUN \
 [ ! -d "${HOME}/.init.d/" ] && ( mkdir "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
 ( \
@@ -1038,9 +1004,10 @@ RUN \
   ) | tee '/entrypoint' > /dev/null \
   && chmod +x '/entrypoint' \
   && chown "$(id -u "${USER}"):$(id -g "${USER}")" '/entrypoint';
+
 RUN \
 du --human-readable --max-depth 1 "${HOME}" > /.size \
-&& expac --humansize M "%n %m" -l'\n' -Q $(pacman -Qq) | sort -hk 2 > /.package-size
+&& expac --humansize M "%n %m" -l'\n' -Q "$(pacman -Qq)" | sort -hk 2 > /.package-size
 USER "${USER}"
 VOLUME ["${HOME}","${WORKDIR}"]
 ENV TERM="xterm"
