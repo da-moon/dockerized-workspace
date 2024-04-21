@@ -801,140 +801,10 @@ RUN \
 # # hadolint ignore=DL4006
 # RUN 'driftctl completion powershell | Out-String | Invoke-Expression' | Out-File -Append -Encoding ascii "$PROFILE"
 # SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
-# #  ╭──────────────────────────────────────────────────────────╮
-# #  │                   package manager                        │
-# #  ╰──────────────────────────────────────────────────────────╯
-# # NOTE: updating packages and installing large packages when gitpod container launches.
-# # This is to minimize the image size during build time as large
-# # images can lead to Gitpod build timing out
-# # TODO: split into pacman and paru
-# # TODO: lock mutex
-# # TODO: run pacman first then run paru
-# RUN \
-#   [ ! -d "${HOME}/.init.d/" ] && ( mkdir "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
-#   ( \
-#   echo '#!/usr/bin/env bash' ; \
-#   echo 'export PIP_NO_CACHE_DIR="off"' ; \
-#   echo 'export MAKEFLAGS="-j$(nproc)"' ; \
-#   echo 'export CGO_ENABLED=1' ; \
-#   echo 'export CGO_LDFLAGS="-g -O2"' ; \
-#   echo 'self="$(realpath -s "${BASH_SOURCE[0]}")"' ; \
-#   echo '[ ! -r "/.extra-pkgs" ] && (' ; \
-#   echo '  sudo pacman -Syyu --noconfirm \' ; \
-#   echo '  && paru -S --noconfirm --needed --removemake --cleanafter \' ; \
-#   echo '      "aur/ttdl" \' ; \
-#   echo '      "aur/devc-bin" \' ; \
-#   echo '      "aur/nodejs-cspell" \' ; \
-#   echo '      "aur/commitlint" \' ; \
-#   echo '      "aur/commitlint-config-conventional" \' ; \
-#   echo '      "aur/earthly-bin" \' ; \
-#   echo '      "aur/forgit" \' ; \
-#   echo '      "aur/git-fuzzy-git" \' ; \
-#   echo '      "aur/git-completion" \' ; \
-#   echo '      "aur/git-shelf" \' ; \
-#   echo '      "aur/diffsitter-bin" \' ; \
-#   echo '      "aur/vendir-bin" \' ; \
-#   echo '      "aur/qsv-bin" \' ; \
-#   echo '      "aur/shellcheck-bin" \' ; \
-#   echo '      "aur/docker-sbom" \' ; \
-#   echo '      "aur/fzfx-git" \' ; \
-#   echo '      "aur/fzf-extras" \' ; \
-#   echo '      "aur/aura-bin" \' ; \
-#   echo '      "aur/paru-bin" \' ; \
-#   echo '      "aur/shellcheck-bin" \' ; \
-#   echo '      "aur/terrascan" \' ; \
-#   echo '      "aur/opa" \' ; \
-#   echo '      "aur/pulumictl" \' ; \
-#   echo '      "aur/infracost" \' ; \
-#   echo '      "aur/k6" \' ; \
-#   echo '      "aur/rancher-k3d-bin" \' ; \
-#   echo '      "aur/envoyproxy-bin" \' ; \
-#   echo '      "aur/gojira" \' ; \
-#   echo '      "aur/litmusctl" \' ; \
-#   echo '      "aur/inlyne-bin" \' ; \
-#   echo '      "aur/jql" \' ; \
-#   echo '      "aur/ripsecrets" \' ; \
-#   echo '      "aur/rnr-bin" \' ; \
-#   echo '      "aur/semgrep-bin" \' ; \
-#   echo '      "aur/awk-language-server" \' ; \
-#   echo '      "aur/dockerfile-language-server-bin" \' ; \
-#   echo '      "aur/terraform-ls-bin" \' ; \
-#   echo '      "aur/pipr-git" \' ; \
-#   echo '      "chaotic-aur/google-cloud-cli" \' ; \
-#   echo '      "cargo-make" \' ; \
-#   echo '      "cargo-edit" \' ; \
-#   echo '      "cargo-deny" \' ; \
-#   echo '      "cargo-udeps" \' ; \
-#   echo '      "cargo-expand" \' ; \
-#   echo '      "cargo-update" \' ; \
-#   echo '      "cargo-watch" \' ; \
-#   echo '      "markdownlint" \' ; \
-#   echo '      "consul-template" \' ; \
-#   echo '      "packer" \' ; \
-#   echo '      "azure-cli" \' ; \
-#   echo '      "chaotic-aur/topgrade" \' ; \
-#   echo '      "python-pre-commit" \' ; \
-#   echo '      "python-certifi" \' ; \
-#   echo '      "goreleaser" \' ; \
-#   echo '      "shfmt" \' ; \
-#   echo '      "nushell" \' ; \
-#   echo '      "mage" \' ; \
-#   echo '      "bottom" \' ; \
-#   echo '      "cocogitto" \' ; \
-#   echo '      "eva" \' ; \
-#   echo '      "hck" \' ; \
-#   echo '      "mdcat" \' ; \
-#   echo '      "navi" \' ; \
-#   echo '      "xh" \' ; \
-#   echo '      "xcp" \' ; \
-#   echo '      "neovim" \' ; \
-#   echo '      "sd" \' ; \
-#   echo '      "duf" \' ; \
-#   echo '      "ncdu" \' ; \
-#   echo '      "ripgrep-all" \' ; \
-#   echo '      "fd" \' ; \
-#   echo '      "tokei" \' ; \
-#   echo '      "hyperfine" \' ; \
-#   echo '      "bat-extras" \' ; \
-#   echo '      "prettier" \' ; \
-#   echo '      "entr" \' ; \
-#   echo '      "podman" \' ; \
-#   echo '      "docker-buildx" \' ; \
-#   echo '      "docker-machine" \' ; \
-#   echo '      "docker-scan" \' ; \
-#   echo '      "docker-compose" \' ; \
-#   echo '      "noto-fonts" \' ; \
-#   echo '      "ttf-ubuntu-font-family" \' ; \
-#   echo '      "ttf-font-awesome" \' ; \
-#   echo '      "gitui" \' ; \
-#   echo '      "rsync" \' ; \
-#   echo '      "unrar" \' ; \
-#   echo '      "dialog" \' ; \
-#   echo '      "psutils" \' ; \
-#   echo '      "rclone" \' ; \
-#   echo '      "moreutils" \' ; \
-#   echo '      "aws-cli-v2" \' ; \
-#   echo '      "vector" \' ; \
-#   echo '      "pulumi" \' ; \
-#   echo '      "istio" \' ; \
-#   echo '      "trivy" \' ; \
-#   echo '      "python-lsp-jsonrpc" \' ; \
-#   echo '      "python-lsp-black" \' ; \
-#   echo '      "python-lsp-server" \' ; \
-#   echo '      "bash-language-server" \' ; \
-#   echo '      "yaml-language-server" \' ; \
-#   echo '      "vscode-json-languageserver" \' ; \
-#   echo '      "gopls" \' ; \
-#   echo '      "marksman" \' ; \
-#   echo '      "cfssl" \' ; \
-#   echo '  && curl -fsSL "https://plandex.ai/install.sh" | bash > /dev/null 2>&1 \' ; \
-#   echo '  && sudo touch "/.extra-pkgs" ;' ; \
-#   echo ') \' ; \
-#   echo ' && echo "${self}"' ; \
-#   ) | tee "${HOME}/.init.d/pacman" > /dev/null \
-#   && chmod +x "${HOME}/.init.d/pacman" \
-#   && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/pacman" ;
-
+#  ╭──────────────────────────────────────────────────────────╮
+#  │                   extra packages                         │
+#  ╰──────────────────────────────────────────────────────────╯
+# "extra/aws-cli-v2" \
 USER "root"
 RUN \
 export PIP_NO_CACHE_DIR="off" ; \
@@ -942,7 +812,7 @@ export MAKEFLAGS="-j$(nproc)" ; \
 export CGO_ENABLED=1 ; \
 export CGO_LDFLAGS="-g -O2" ; \
 pacman -Syyu --noconfirm \
-&& pacman -S --noconfirm --needed \
+&& paru -Sy --noconfirm --needed \
   "cargo-make" \
   "cargo-edit" \
   "cargo-deny" \
@@ -995,7 +865,6 @@ pacman -Syyu --noconfirm \
   "psutils" \
   "rclone" \
   "moreutils" \
-  "aws-cli-v2" \
   "vector" \
   "pulumi" \
   "istio" \
