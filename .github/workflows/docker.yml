@@ -12,6 +12,7 @@ on:
   #   branches: [master]
   workflow_dispatch:
 jobs:
+  # TODO: use cloud-builder
   build-and-push:
     name: "build and push docker image"
     runs-on: ubuntu-latest
@@ -60,4 +61,7 @@ jobs:
               fi
             fi
           fi
-          bash build.sh
+          docker buildx create --driver cloud "fjolsvin/dockerized-workspace"
+          docker buildx use cloud-fjolsvin-dockerized-workspace --global
+          docker buildx bake \
+            --set "default.args.CHAOTIC_AUR_KEY=${CHAOTIC_AUR_KEY}"
