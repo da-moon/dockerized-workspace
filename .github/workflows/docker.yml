@@ -4,12 +4,13 @@ on:
   # schedule:
   #   # At the end of every day
   #   - cron: "0 0 * * *"
-  # push:
-  #   branches: [master]
-  #   paths:
-  #     - ".gp/Dockerfile"
-  # pull_request:
-  #   branches: [master]
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/docker.yml"
+      - ".gp/Dockerfile"
+  pull_request:
+    branches: [master]
   workflow_dispatch:
 jobs:
   # TODO: use cloud-builder
