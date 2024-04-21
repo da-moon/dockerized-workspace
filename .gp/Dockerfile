@@ -515,7 +515,7 @@ RUN \
   echo 'export RUSTUP_HOME="${HOME}/.rustup";' ; \
   echo 'export CARGO_HOME="${HOME}/.cargo";' ; \
   echo 'export PATH="${PATH}:${CARGO_HOME}/bin";' ; \
-  ) | tee -a "/etc/profile.d/00-rust" > /dev/null \
+  ) | tee -a "/etc/profile.d/00-rust.sh" > /dev/null \
   rustup toolchain install "stable" \
   && cargo install --locked --git "https://hg.sr.ht/~cyplo/legdur" \
   && cargo install --locked --git "https://github.com/flatt-security/shisho.git" \
