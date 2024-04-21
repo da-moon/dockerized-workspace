@@ -39,14 +39,17 @@ jobs:
             echo "DOCKER_USERNAME is not set" ;
             exit 1 ;
           fi
-      - name: "Login to Docker Container Repository"
-        run: >
-          echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME}
-          --password-stdin
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: "lab:latest"
+          driver: cloud
+          endpoint: "fjolsvin/dockerized-workspace"
       - name: "build and push docker image"
         shell: bash
         env:
@@ -61,7 +64,7 @@ jobs:
               fi
             fi
           fi
-          docker buildx create --driver cloud "fjolsvin/dockerized-workspace"
+          # docker buildx create --driver cloud "fjolsvin/dockerized-workspace"
           docker buildx use cloud-fjolsvin-dockerized-workspace --global
           docker buildx bake \
             --set "default.args.CHAOTIC_AUR_KEY=${CHAOTIC_AUR_KEY}"
