@@ -1,7 +1,8 @@
 ---
 image:
-  file: .gp/Dockerfile
-  context: .
+  fjolsvin/gp-archlinux-workspace:latest
+  # file: .gp/Dockerfile
+  # context: .
 tasks:
   - name: update-packages
     openMode: tab-before
