@@ -520,9 +520,16 @@ RUN \
   && cargo install --locked --git "https://hg.sr.ht/~cyplo/legdur" \
   && cargo install --locked --git "https://github.com/flatt-security/shisho.git" \
   && cargo binstall --quiet --no-confirm \
+  "cargo-make" \
+  "cargo-edit" \
+  "cargo-deny" \
+  "cargo-udeps" \
+  "cargo-update" \
   "cargo-cache" \
   "smartcat" \
   "aichat" \
+  "pipr" \
+  "ttdl" \
   "prose" \
   && cargo-cache --remove-dir "all" > /dev/null 2>&1 \
   && rustup toolchain list | cut -d' ' -f1 | xargs -r -I {} rustup --quiet toolchain uninstall {} ; \
@@ -813,13 +820,6 @@ export CGO_ENABLED=1 ; \
 export CGO_LDFLAGS="-g -O2" ; \
 pacman -Syyu --noconfirm \
 && paru -Sy --noconfirm --needed \
-  "cargo-make" \
-  "cargo-edit" \
-  "cargo-deny" \
-  "cargo-udeps" \
-  "cargo-expand" \
-  "cargo-update" \
-  "cargo-watch" \
   "markdownlint" \
   "consul-template" \
   "packer" \
@@ -880,7 +880,6 @@ pacman -Syyu --noconfirm \
   "cfssl"  \
   "chaotic-aur/google-cloud-cli" \
 && su-exec "${USER}" paru -S --noconfirm --needed --removemake --cleanafter \
-  "aur/ttdl" \
   "aur/devc-bin" \
   "aur/nodejs-cspell" \
   "aur/commitlint" \
@@ -897,8 +896,6 @@ pacman -Syyu --noconfirm \
   "aur/docker-sbom" \
   "aur/fzfx-git" \
   "aur/fzf-extras" \
-  "aur/aura-bin" \
-  "aur/paru-bin" \
   "aur/shellcheck-bin" \
   "aur/terrascan" \
   "aur/opa" \
@@ -917,7 +914,6 @@ pacman -Syyu --noconfirm \
   "aur/awk-language-server" \
   "aur/dockerfile-language-server-bin" \
   "aur/terraform-ls-bin" \
-  "aur/pipr-git" \
   && curl -fsSL "https://plandex.ai/install.sh" | bash > /dev/null 2>&1 \
   && compress-packages ;
 #  ╭──────────────────────────────────────────────────────────╮
