@@ -827,6 +827,7 @@ RUN \
 #  │                   extra packages                         │
 #  ╰──────────────────────────────────────────────────────────╯
 # "extra/aws-cli-v2" \
+# "aur/semgrep-bin" \
 USER "root"
 RUN \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
@@ -928,7 +929,6 @@ mkdir -p "${HOME}/.local/state/paru" \
   "aur/jql" \
   "aur/ripsecrets" \
   "aur/rnr-bin" \
-  "aur/semgrep-bin" \
   "aur/awk-language-server" \
   "aur/dockerfile-language-server-bin" \
   "aur/terraform-ls-bin" \
