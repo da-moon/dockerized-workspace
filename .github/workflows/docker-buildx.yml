@@ -1,31 +1,18 @@
 ---
-name: "docker"
+name: "docker-buildx"
 on:
-  # schedule:
-  #   # At the end of every day
-  #   - cron: "0 0 * * *"
-  # push:
-  #   branches: [master]
-  #   paths:
-  #     - ".github/workflows/docker.yml"
-  #     - ".gp/Dockerfile"
-  # pull_request:
-  #   branches: [master]
   workflow_dispatch:
 jobs:
-  # TODO: use cloud-builder
+  # act --secret GITHUB_TOKEN="$(gh auth token)" --secret DOCKER_USERNAME="fjolsvin" --secret DOCKER_PASSWORD="$(pass 'docker/password')" --env-file "" --job "build-and-push"
   build-and-push:
     name: "build and push docker image"
-    runs-on: ubuntu-latest
+    runs-on: "ubuntu-latest"
     steps:
-      - name: Check out the repo
-        uses: actions/checkout@v3
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          install: true
+      - name: "Check out the repo"
+        id: "check-out-the-repo"
+        uses: "actions/checkout@v3"
       - name: "Check Docker Credentials"
+        id: "check-docker-credentials"
         shell: bash
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
@@ -37,21 +24,25 @@ jobs:
             exit 1 ;
           fi
           if [ -z "${DOCKER_PASSWORD+x}" ] || [ -z "${DOCKER_PASSWORD}" ]; then
-            echo "DOCKER_USERNAME is not set" ;
+            echo "DOCKER_PASSWORD is not set" ;
             exit 1 ;
           fi
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+      - name: "Log in to Docker Hub"
+        id: "log-in-to-docker-hub"
+        uses: "docker/login-action@v3"
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: "Set up Docker Buildx"
+        id: "set-up-docker-buildx"
+        uses: "docker/setup-buildx-action@v3"
         with:
           version: "lab:latest"
-          driver: cloud
+          driver: "cloud"
           endpoint: "fjolsvin/dockerized-workspace"
+          use: true
       - name: "build and push docker image"
+        id: "build-and-push-docker-image"
         shell: bash
         env:
           LOCAL: false
@@ -65,7 +56,6 @@ jobs:
               fi
             fi
           fi
-          # docker buildx create --driver cloud "fjolsvin/dockerized-workspace"
-          docker buildx use cloud-fjolsvin-dockerized-workspace --global
+          docker buildx use --global "${{steps.set-up-docker-buildx.outputs.name}}"
           docker buildx bake \
             --set "default.args.CHAOTIC_AUR_KEY=${CHAOTIC_AUR_KEY}"

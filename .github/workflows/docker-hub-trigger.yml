@@ -1,0 +1,53 @@
+---
+name: "docker-hub-trigger"
+on:
+  schedule:
+    # At the end of every day
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+jobs:
+  # act --secret DOCKER_REPOSITORY_TRIGGER_TOKEN="" --secret DOCKER_REPOSITORY_TRIGGER_ID="" --env-file "" --job "trigger-remote-build"
+  trigger-remote-build:
+    name: "build and push docker image"
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: "Check out the repo"
+        id: "check-out-the-repo"
+        uses: "actions/checkout@v3"
+      - name: "Check Docker Credentials"
+        id: "check-docker-credentials"
+        shell: bash
+        env:
+          DOCKER_REPOSITORY_TRIGGER_TOKEN:
+            "${{ secrets.DOCKER_REPOSITORY_TRIGGER_TOKEN }}"
+          DOCKER_REPOSITORY_TRIGGER_ID:
+            "${{ secrets.DOCKER_REPOSITORY_TRIGGER_ID }}"
+        run: |
+          set -ex ;
+          if [ -z "${DOCKER_REPOSITORY_TRIGGER_TOKEN+x}" ] || [ -z "${DOCKER_REPOSITORY_TRIGGER_TOKEN}" ]; then
+            echo "DOCKER_REPOSITORY_TRIGGER_TOKEN is not set" ;
+            exit 1 ;
+          fi
+          if [ -z "${DOCKER_REPOSITORY_TRIGGER_ID+x}" ] || [ -z "${DOCKER_REPOSITORY_TRIGGER_ID}" ]; then
+            echo "DOCKER_REPOSITORY_TRIGGER_ID is not set" ;
+            exit 1 ;
+          fi
+      - name: "Trigger Remote Build"
+        id: "build-and-push-docker-image"
+        shell: bash
+        env:
+          DOCKER_REPOSITORY_TRIGGER_TOKEN:
+            "${{ secrets.DOCKER_REPOSITORY_TRIGGER_TOKEN }}"
+          DOCKER_REPOSITORY_TRIGGER_ID:
+            "${{ secrets.DOCKER_REPOSITORY_TRIGGER_ID }}"
+          CHAOTIC_AUR_KEY: "3056513887B78AEB"
+        run: |
+          set -ex ;
+          jq \
+            --arg CHAOTIC_AUR_KEY "${CHAOTIC_AUR_KEY}" \
+            -ncM '{"CHAOTIC_AUR_KEY":$CHAOTIC_AUR_KEY}' \
+            | curl -XPOST -ksSL --fail-with-body --fail-early \
+              --header "Content-Type: application/json" \
+              --data @- \
+              "https://hub.docker.com/api/build/v1/source/${DOCKER_REPOSITORY_TRIGGER_TOKEN}/trigger/${DOCKER_REPOSITORY_TRIGGER_ID}/call/" \
+          > /dev/null 2>&1

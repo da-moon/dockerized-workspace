@@ -79,7 +79,8 @@ RUN \
   -p https \
   --latest 5 \
   --sort rate \
-  --save "/etc/pacman.d/mirrorlist" > /dev/null 2>&1
+  --save "/etc/pacman.d/mirrorlist" > /dev/null 2>&1 \
+  && pacman --quiet --noprogressbar -Syyu --noconfirm  ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                   user and group setup                   │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -87,7 +88,7 @@ RUN \
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet --noprogressbar -Syy --noconfirm --needed "sudo" "openssl" \
+  pacman --quiet --noprogressbar -S --noconfirm --needed "sudo" "openssl" \
   && ! getent group "${USER}" > /dev/null \
   && groupadd --gid "${UID}" "${USER}" > /dev/null > /dev/null \
   && useradd \
@@ -269,11 +270,12 @@ USER "root"
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet -S --noconfirm --needed "docker" "docker-compose"  > /dev/null 2>&1 ; \
+  pacman --quiet -S --noconfirm --needed "docker" "docker-compose" "docker-buildx" > /dev/null 2>&1 ; \
+
+  # ─── DOCKER FROM DOCKER ─────────────────────────────────────────────────────────
   ( \
   echo '#!/bin/sh' ; \
   echo 'sudoIf() { if [ "$(id -u)" -ne 0 ]; then sudo "$@"; else "$@"; fi }' ; \
-  # ─── DOCKER FROM DOCKER ─────────────────────────────────────────────────────────
   echo 'if [ -r "/var/run/docker.sock" ];then' ; \
   echo 'SOCKET_GID="$(stat -c "%g" "/var/run/docker.sock")" ; ' ; \
   echo '  if [ "${SOCKET_GID}" != 0 ]; then' ; \
@@ -283,6 +285,7 @@ RUN \
   echo 'fi' ; \
   ) | tee '/usr/local/share/docker-from-docker.sh' > /dev/null \
   && chmod +x '/usr/local/share/docker-from-docker.sh' ; \
+  # ─── DOCKER ALIASES ───────────────────────────────────────────────────────
   ( \
   echo "alias docker-run='docker run --rm -it -v \"\${PWD}:/workspace\"' ;" ; \
   echo "alias docker-run-u='docker-run --user \"\$(id -u):\$(id -g)\"' ;" ; \
@@ -297,7 +300,8 @@ RUN \
   echo "alias rmcontainers='docker ps -aq | xargs -r docker rm -f' ;" ; \
   echo "alias gitlint='docker run -u \"\$(id -u):\$(id -g)\" -w \"/repo\" --rm -it --ulimit nofile=1024 -v \"\$(pwd):/repo\" \"jorisroovers/gitlint\"' ;" ; \
   echo "alias reveal-md='docker run --rm  -u \"\$(id -u):\$(id -g)\" -p \"1948:1948\" -p \"35729:35729\" -v \"\$(pwd):/slides\" \"webpronl/reveal-md:latest\" /slides --watch' ;" ; \
-  ) | tee "/etc/profile.d/docker.sh" > /dev/null || exit 1 ;
+  ) | tee "/etc/profile.d/docker.sh" > /dev/null || exit 1 ; \
+  compress-packages ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                      useful dev cli tools                │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -305,8 +309,11 @@ USER "root"
 ENV COLORTERM="truecolor"
 ENV EDITOR="hx"
 ENV VISUAL="hx"
-ENV _ZO_DATA_DIR="/workspace/zoxide/"
-ENV GEM_PATH="${HOME}/.gem"
+ENV _ZO_DATA_DIR="${WORKDIR}/.zoxide/"
+ENV GEM_PATH="${WORKDIR}/.gem"
+ENV npm_config_prefix="${WORKDIR}/.npm"
+ENV PATH="${PATH}:${npm_config_prefix}/bin"
+ENV GO_PATH="${WORKDIR}/.go"
 ENV GO111MODULE="on"
 ENV CGO_ENABLED="0"
 ENV CGO_LDFLAGS="-s -w -extldflags '-static'"
@@ -324,6 +331,7 @@ RUN \
   "luarocks" \
   "python" \
   "python-pip" \
+  "python-poetry" \
   "python-setuptools" \
   "ruby" \
   "nodejs" \
@@ -331,6 +339,7 @@ RUN \
   "yarn" \
   "starship" \
   "fzf" \
+  "go-yq" \
   "github-cli" \
   "git-delta" \
   "difftastic" \
@@ -361,58 +370,51 @@ RUN \
   #  ╭──────────────────────────────────────────────────────────╮
   #  │                     python setup                         │
   #  ╰──────────────────────────────────────────────────────────╯
-  sudo -i -u "${USER}" \
-  bash -c 'curl -sSL https://install.python-poetry.org | python3 -' > /dev/null 2>&1 \
-  && ln -sf "${HOME}/.local/bin/poetry" "/usr/local/bin/poetry" \
-  && poetry --version > /dev/null 2>&1 && ( \
-  echo 'eval "$(poetry completions bash)" ;' ; \
+  poetry --version > /dev/null 2>&1 && ( \
+    echo 'eval "$(poetry completions bash)" ;' ; \
   ) | tee "/etc/profile.d/poetry.sh" > /dev/null || exit 1 ; \
   #  ╭──────────────────────────────────────────────────────────╮
   #  │                 nodejs setup                             │
   #  ╰──────────────────────────────────────────────────────────╯
-  node  --version >/dev/null 2>&1 && npm  --version >/dev/null 2>&1 && echo 'export PATH="$(npm -g bin):${PATH}" ;' > "/etc/profile.d/npm.sh" || exit 1 \
-  yarn --version >/dev/null 2>&1 && echo 'export PATH="$(yarn global bin):${PATH}" ;' > "/etc/profile.d/yarn.sh" || exit 1 \
   #  ╭──────────────────────────────────────────────────────────╮
   #  │                 powershell init                          │
   #  ╰──────────────────────────────────────────────────────────╯
-  pwsh --version && ( \
-    pwsh -c ' \
-  $parent=Split-Path -parent $PROFILE ; if (-not(Test-Path -Path $parent -PathType Container)) {$null = New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop} \
-  ' ; \
+  pwsh --version > /dev/null 2>&1 && ( \
+    pwsh -c '$parent=Split-Path -parent $PROFILE ; if (-not(Test-Path -Path $parent -PathType Container)) {$null = New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop}' ; \
   ) || exit 1 ; \
   # ─── USE DELTA FOR GIT DIFFS ────────────────────────────────────────────────────
   delta --version > /dev/null 2>&1 && ( \
-  git config --system pager.diff delta \
-  && git config --system pager.log delta \
-  && git config --system pager.reflog delta \
-  && git config --system pager.show delta \
-  && git config --system interactive.difffilter "delta --color-only --features=interactive" \
-  && git config --system delta.features "side-by-side line-numbers decorations" \
-  && git config --system delta.whitespace-error-style "22 reverse" \
-  && git config --system delta.decorations.commit-decoration-style "bold yellow box ul" \
-  && git config --system delta.decorations.file-style "bold yellow ul" \
-  && git config --system delta.decorations.file-decoration-style "none" \
-  && git config --system delta.decorations.commit-style "raw" \
-  && git config --system delta.decorations.hunk-header-decoration-style "blue box" \
-  && git config --system delta.decorations.hunk-header-file-style "red" \
-  && git config --system delta.decorations.hunk-header-line-number-style "#067a00" \
-  && git config --system delta.decorations.hunk-header-style "file line-number syntax" \
-  && git config --system delta.interactive.keep-plus-minus-markers "false" \
+    git config --system pager.diff delta \
+    && git config --system pager.log delta \
+    && git config --system pager.reflog delta \
+    && git config --system pager.show delta \
+    && git config --system interactive.difffilter "delta --color-only --features=interactive" \
+    && git config --system delta.features "side-by-side line-numbers decorations" \
+    && git config --system delta.whitespace-error-style "22 reverse" \
+    && git config --system delta.decorations.commit-decoration-style "bold yellow box ul" \
+    && git config --system delta.decorations.file-style "bold yellow ul" \
+    && git config --system delta.decorations.file-decoration-style "none" \
+    && git config --system delta.decorations.commit-style "raw" \
+    && git config --system delta.decorations.hunk-header-decoration-style "blue box" \
+    && git config --system delta.decorations.hunk-header-file-style "red" \
+    && git config --system delta.decorations.hunk-header-line-number-style "#067a00" \
+    && git config --system delta.decorations.hunk-header-style "file line-number syntax" \
+    && git config --system delta.interactive.keep-plus-minus-markers "false" \
   ) || exit 1 ; \
   go-task --version > /dev/null 2>&1 && ( \
-  ln -sf "$(which "go-task" 2>/dev/null)" "/usr/local/bin/task" ; \
+    ln -sf "$(which "go-task" 2>/dev/null)" "/usr/local/bin/task" ; \
   ) || exit 1 ; \
   starship --version > /dev/null 2>&1 && echo 'eval "$(starship init bash)" ;' > "/etc/profile.d/starship.sh" || exit 1 ; \
+  yq --version > /dev/null 2>&1 && echo 'eval "$(yq shell-completion bash)" ;' > "/etc/profile.d/yq.sh" || exit 1 ; \
   just --version > /dev/null 2>&1 && ( \
-  echo 'eval "$(just --completions bash)" ;' > "/etc/profile.d/just.sh" ; \
+    echo 'eval "$(just --completions bash)" ;' > "/etc/profile.d/just.sh" ; \
   ) || exit 1 ; \
-  zoxide --version && ( \
-  ( \
-  echo 'export _ZO_DATA_DIR="/workspace/zoxide" ; ' ; \
-  echo '[ ! -d "${_ZO_DATA_DIR}" ] && mkdir "${_ZO_DATA_DIR}" ;' ; \
-  echo 'eval "$(zoxide init bash)" ;' ; \
-  echo 'alias cd="z"' ; \
-  ) | tee "/etc/profile.d/zoxide.sh" > /dev/null || exit 1 ; \
+  zoxide --version > /dev/null 2>&1 && ( \
+    ( \
+      echo '[ ! -d "${_ZO_DATA_DIR}" ] && mkdir "${_ZO_DATA_DIR}" ;' ; \
+      echo 'eval "$(zoxide init bash)" ;' ; \
+      echo 'alias cd="z"' ; \
+    ) | tee "/etc/profile.d/zoxide.sh" > /dev/null || exit 1 ; \
   ) || exit 1 ; \
   bat --version > /dev/null 2>&1 && ( \
   echo 'alias cat="bat -pp" ;' ; \
@@ -426,127 +428,142 @@ RUN \
   echo 'alias ls="eza" ;' ; \
   ) | tee "/etc/profile.d/eza.sh" > /dev/null || exit 1 ; \
   gh --version > /dev/null 2>&1 && ( \
-  echo 'eval "$(gh completion -s bash)" ;' > "/etc/profile.d/gh.sh" ; \
-  pwsh --version && ( \
-  pwsh -c ' \
-  "Invoke-Expression -Command $(gh completion -s powershell | Out-String)" \
-  | Out-File -Append -Encoding ascii "$PROFILE" \
-  ' ; \
-  ) || exit 0 ; \
+    echo 'eval "$(gh completion -s bash)" ;' > "/etc/profile.d/gh.sh" ; \
+    pwsh --version && ( \
+    pwsh -c ' \
+    Invoke-Expression -Command $(gh completion -s powershell | Out-String) | Out-File -Append -Encoding ascii "$PROFILE" \
+    ' ; \
+    ) || exit 0 ; \
   ) || exit 1 ; \
   atuin --version > /dev/null 2>&1 && ( \
-  echo '[ ! -d "${HOME}/.config/atuin" ] && mkdir "${HOME}/.config/atuin" ;' ; \
-  echo 'wget -qO "${HOME}/.config/atuin/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/atuin/config.toml" ;' ; \
-  echo 'sed -i "/db_path/d" "${HOME}/.config/atuin/config.toml"' ; \
-  echo "echo 'db_path = \"${WORKDIR}/.history.db\"' >> '${HOME}/.config/atuin/config.toml' ;" ; \
-  echo '[[ -r "/usr/share/bash-preexec/bash-preexec.sh" ]] && source "/usr/share/bash-preexec/bash-preexec.sh"' ; \
-  echo 'eval "$(atuin init bash)" ;' ; \
+    echo '[ ! -d "${HOME}/.config/atuin" ] && mkdir "${HOME}/.config/atuin" ;' ; \
+    echo 'wget -qO "${HOME}/.config/atuin/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/atuin/config.toml" ;' ; \
+    echo 'sed -i "/db_path/d" "${HOME}/.config/atuin/config.toml"' ; \
+    echo "echo 'db_path = \"${WORKDIR}/.history.db\"' >> '${HOME}/.config/atuin/config.toml' ;" ; \
+    echo '[[ -r "/usr/share/bash-preexec/bash-preexec.sh" ]] && source "/usr/share/bash-preexec/bash-preexec.sh"' ; \
+    echo 'eval "$(atuin init bash)" ;' ; \
   ) | tee "/etc/profile.d/atuin.sh" > /dev/null || exit 1 ; \
   xplr --version > /dev/null 2>&1 && ( \
-  echo '[ ! -d "${HOME}/.config/xplr" ] && mkdir -p "${HOME}/.config/xplr" ;' ; \
-  echo 'wget -qO "${HOME}/.config/xplr/init.lua" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/xplr/init.lua" ;' ; \
+    echo '[ ! -d "${HOME}/.config/xplr" ] && mkdir -p "${HOME}/.config/xplr" ;' ; \
+    echo 'wget -qO "${HOME}/.config/xplr/init.lua" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/xplr/init.lua" ;' ; \
   ) | tee "/etc/profile.d/xplr.sh" > /dev/null  || exit 1 ; \
   fzf --version > /dev/null 2>&1 && ( \
-  echo '_fzf_complete_make() {' ; \
-  echo '  FZF_COMPLETION_TRIGGER="" _fzf_complete "-1" "${@}" < <(make -pqr 2>/dev/null \' ; \
-  echo '  | awk -F":" "/^[a-zA-Z0-9][^\$#\/\t=]*:([^=]|\$)/ {split(\$1,A,/ /);for(i in A)print A[i]}" \' ; \
-  echo '  | grep -v Makefile \' ; \
-  echo '  | sort -u)' ; \
-  echo '}' ; \
-  echo '[[ -n ${BASH} ]] && complete -F _fzf_complete_make -o default -o bashdefault make' ; \
-  echo '[ -r "/usr/share/fzf/key-bindings.bash" ] && source "/usr/share/fzf/key-bindings.bash"' ; \
-  echo '[ -r "/usr/share/fzf/completion.bash" ] && source "/usr/share/fzf/completion.bash"' ; \
-  echo '[ -r "/usr/share/fzf/fzf-extras.bash" ] && source "/usr/share/fzf/fzf-extras.bash"' ; \
+    echo '_fzf_complete_make() {' ; \
+    echo '  FZF_COMPLETION_TRIGGER="" _fzf_complete "-1" "${@}" < <(make -pqr 2>/dev/null \' ; \
+    echo '  | awk -F":" "/^[a-zA-Z0-9][^\$#\/\t=]*:([^=]|\$)/ {split(\$1,A,/ /);for(i in A)print A[i]}" \' ; \
+    echo '  | grep -v Makefile \' ; \
+    echo '  | sort -u)' ; \
+    echo '}' ; \
+    echo '[[ -n ${BASH} ]] && complete -F _fzf_complete_make -o default -o bashdefault make' ; \
+    echo '[ -r "/usr/share/fzf/key-bindings.bash" ] && source "/usr/share/fzf/key-bindings.bash"' ; \
+    echo '[ -r "/usr/share/fzf/completion.bash" ] && source "/usr/share/fzf/completion.bash"' ; \
+    echo '[ -r "/usr/share/fzf/fzf-extras.bash" ] && source "/usr/share/fzf/fzf-extras.bash"' ; \
   ) | tee "/etc/profile.d/fzf.sh" > /dev/null || exit 1 ; \
   ( \
-  echo 'if hx --version > /dev/null 2>&1 ; then' ;\
-  echo '  export EDITOR="hx" ;' ;\
-  echo '  export VISUAL="hx" ;' ;\
-  echo '  [ ! -d "${HOME}/.config/helix" ] && mkdir "${HOME}/.config/helix" ;' ; \
-  echo '  wget -qO "${HOME}/.config/helix/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/helix/config.toml" ;' ; \
-  echo 'fi' ;\
+    echo 'if hx --version > /dev/null 2>&1 ; then' ;\
+    echo '  export EDITOR="hx" ;' ;\
+    echo '  export VISUAL="hx" ;' ;\
+    echo '  [ ! -d "${HOME}/.config/helix" ] && mkdir "${HOME}/.config/helix" ;' ; \
+    echo '  wget -qO "${HOME}/.config/helix/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/helix/config.toml" ;' ; \
+    echo 'fi' ;\
   ) | tee "/etc/profile.d/editor.sh" > /dev/null || exit 1 ; \
+  # NOTE: ensures shell always has the latest gipod variables
   ( \
-  # ensures shell always has the latest gipod variables
-  echo 'if gp version > /dev/null 2>&1 ; then' ;\
-  echo '  eval "$(gp env --export)" ;' ;\
-  echo 'fi' ;\
+    echo 'if gp version > /dev/null 2>&1 ; then' ;\
+    echo '  eval "$(gp env --export)" ;' ;\
+    echo 'fi' ;\
   ) | tee "/etc/profile.d/gitpod.sh" > /dev/null || exit 1 ; \
   echo '[ -r "${HOME}/.local/share/bash-completion/completions/git-forgit.bash" ] && source "${HOME}/.local/share/bash-completion/completions/git-forgit.bash"' > "/etc/profile.d/forgit.sh" > /dev/null || exit 1 ; \
   compress-packages ;
-USER "${USER}"
-SHELL ["/usr/bin/pwsh", "-NoLogo", "-Command"]
-RUN $parent=Split-Path -parent $PROFILE ; if (-not(Test-Path -Path $parent -PathType Container)) {$null = New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop}
-SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 #  ────────────────────────────────────────────────────────────
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 rust setup                               │
 #  ╰──────────────────────────────────────────────────────────╯
 USER "root"
-ENV RUSTUP_HOME="${HOME}/.rustup"
-ENV CARGO_HOME="${HOME}/.cargo"
+ENV RUSTUP_HOME="${WORKDIR}/.rustup"
+ENV CARGO_HOME="${WORKDIR}/.cargo"
 ENV PATH="${PATH}:${CARGO_HOME}/bin"
 # hadolint ignore=SC2016
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --noconfirm -Rcns "rust" || true \
-  && pacman --quiet --noprogressbar -S --noconfirm --needed "rustup" "cargo-binstall" ; \
+  pacman --quiet --noprogressbar -S --noconfirm --needed "rustup" "cargo-binstall" ; \
+  #  ────────────────────────────────────────────────────────────
+  # NOTE: installing rustup toolchains after container starts up. this helps with minimizing docker image size
   # https://stackoverflow.com/questions/28227739/lock-a-file-in-bash-using-flock-and-lockfile
+  #  ────────────────────────────────────────────────────────────
   rustup --version > /dev/null 2>&1 && ( \
-  echo '(' ; \
-  echo '  flock -x -n 3 || exit 55 ;' ; \
-  echo '  ! ( rustup toolchain list | grep -q "nightly" ) && rustup toolchain install nightly ;' ; \
-  echo ') 3> "/tmp/rust-nightly.lock"' ; \
-  echo '(' ; \
-  echo '  flock -x -n 4 || exit 55 ;' ; \
-  echo '  ! ( rustup toolchain list | grep -q "stable" ) && (rustup toolchain install stable && rustup default stable );' ; \
-  echo ') 4> "/tmp/rust-stable.lock"' ; \
-  echo '{' ; \
-  echo '  flock -s 3 ;' ; \
-  echo '  flock -u 3 ;' ; \
-  echo '} 3<"/tmp/rust-nightly.lock" ;' ; \
-  echo '{' ; \
-  echo '  flock -s 4 ;' ; \
-  echo '  flock -u 4 ;' ; \
-  echo '} 4<"/tmp/rust-stable.lock"' ; \
-  echo '[ -r "/tmp/rust-nightly.lock" ] && rm "/tmp/rust-nightly.lock" ;' ; \
-  echo '[ -r "/tmp/rust-stable.lock" ] && rm "/tmp/rust-stable.lock" ;' ; \
-  echo 'export RUSTUP_HOME="${HOME}/.rustup";' ; \
-  echo 'export CARGO_HOME="${HOME}/.cargo";' ; \
-  echo 'export PATH="${PATH}:${CARGO_HOME}/bin";' ; \
+    echo '(' ; \
+    echo '  flock -x -n 3 || exit 55 ;' ; \
+    echo '  ! ( rustup toolchain list | grep -q "nightly" ) && rustup toolchain install nightly ;' ; \
+    echo ') 3> "/tmp/rust-nightly.lock"' ; \
+    echo '(' ; \
+    echo '  flock -x -n 4 || exit 55 ;' ; \
+    echo '  ! ( rustup toolchain list | grep -q "stable" ) && (rustup toolchain install stable && rustup default stable );' ; \
+    echo ') 4> "/tmp/rust-stable.lock"' ; \
+    echo '{' ; \
+    echo '  flock -s 3 ;' ; \
+    echo '  flock -u 3 ;' ; \
+    echo '} 3<"/tmp/rust-nightly.lock" ;' ; \
+    echo '{' ; \
+    echo '  flock -s 4 ;' ; \
+    echo '  flock -u 4 ;' ; \
+    echo '} 4<"/tmp/rust-stable.lock"' ; \
+    echo '[ -r "/tmp/rust-nightly.lock" ] && rm "/tmp/rust-nightly.lock" ;' ; \
+    echo '[ -r "/tmp/rust-stable.lock" ] && rm "/tmp/rust-stable.lock" ;' ; \
+    echo 'export RUSTUP_HOME="${HOME}/.rustup";' ; \
+    echo 'export CARGO_HOME="${HOME}/.cargo";' ; \
+    echo 'export PATH="${PATH}:${CARGO_HOME}/bin";' ; \
   ) | tee -a "/etc/profile.d/00-rust.sh" > /dev/null \
-  rustup toolchain install "stable" \
-  && cargo install --locked --git "https://hg.sr.ht/~cyplo/legdur" \
-  && cargo install --locked --git "https://github.com/flatt-security/shisho.git" \
+  && rustup default "stable" \
+  # NOTE: shisho adds a lot to build time and I don't use it at
+  # the moment so it has been commented out
+  # && cargo install --locked --git "https://github.com/flatt-security/shisho.git" \
   && cargo binstall --quiet --no-confirm \
+  "cargo-cache" \
   "cargo-make" \
   "cargo-edit" \
   "cargo-deny" \
   "cargo-udeps" \
   "cargo-update" \
-  "cargo-cache" \
+  "legdur" \
   "smartcat" \
   "aichat" \
   "pipr" \
   "ttdl" \
   "prose" \
-  && cargo-cache --remove-dir "all" > /dev/null 2>&1 \
-  && rustup toolchain list | cut -d' ' -f1 | xargs -r -I {} rustup --quiet toolchain uninstall {} ; \
+  "jaq" \
+  && find "${CARGO_HOME}/bin" \
+    -type f \
+    -executable \
+    -exec sh -c "file -i '{}' |  grep -q -E 'application/x-(pie-)?executable; charset=binary'" \; \
+    -print \
+    | xargs \
+        -P `nproc` \
+        --no-run-if-empty \
+        bash -c ' \
+      for pkg do \
+          strip "$pkg" || true ; \
+          upx "$pkg" || true ; \
+      done' bash ; \
   # For fixing the following error:
   #
   # ❯ sudo su -
   # -bash: /etc/bash_completion.d/cargo: No such file or directory
-  [ -d "/usr/share/bash-completion/completions" ] && ( \
-  [ ! -r "/usr/share/bash-completion/completions/cargo" ]  \
-  && rustup completions bash cargo > "/usr/share/bash-completion/completions/cargo" || exit 0 ; \
-  [ ! -r "/usr/share/bash-completion/completions/rustup" ]  \
-  && rustup completions bash rustup > "/usr/share/bash-completion/completions/rustup" || exit 0 ; \
+  ( \
+    [ -d "/usr/share/bash-completion/completions" ] && ( \
+      ( [ ! -r "/usr/share/bash-completion/completions/cargo" ] && rustup completions bash cargo > "/usr/share/bash-completion/completions/cargo" || exit 0 ; ) ; \
+      ( [ ! -r "/usr/share/bash-completion/completions/rustup" ] && rustup completions bash rustup > "/usr/share/bash-completion/completions/rustup" || exit 0 ; ) ; \
+    ) || exit 0 ; \
+  ) ; \
+  [ -r "${CARGO_HOME}/.crates.toml" ] && ( \
+    while read BIN; do \
+      ln -sf "$(which "${BIN}")" "/usr/local/bin/${BIN}" ; \
+    done < <(yq eval '.v1.*|sort|.[]' "${CARGO_HOME}/.crates.toml"); \
   ) || exit 0 \
-  compress-packages ; \
-  while read BIN ; do \
-  upx "$(which "${BIN}")" ; \
-  done ; < <(cat "${CARGO_HOME}/.crates2.json"  | jq -r ".installs | to_entries[].value.bins[]" | sort -u)
+  && cargo-cache --remove-dir "all" > /dev/null 2>&1 \
+  && rustup toolchain list | cut -d' ' -f1 | xargs -r -I {} rustup --quiet toolchain uninstall {}  ; \
+  compress-packages ; 
 RUN du --human-readable --max-depth 1 "${HOME}" > /.rustup
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 install ruby packages                    │
@@ -571,12 +588,10 @@ RUN \
   "remark-preset-lint-recommended" \
   "remark-lint-list-item-indent" \
   "remark-reference-links" \
-  && npm cache clean --quiet --force \
-  && compress-packages ;
+&& npm cache clean --quiet --force 
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                      dev tools                           │
 #  ╰──────────────────────────────────────────────────────────╯
-
 #
 # The following logins and runs the command. The login cause rust toolchain to get
 # Installed which makes the image larger
@@ -698,7 +713,7 @@ RUN \
   go clean -cache > /dev/null 2>&1 ; \
   su-exec "${USER}" go clean -cache > /dev/null 2>&1 ; \
   done ; \
-  rm -rf "${HOME}/go/pkg/mod" ; \
+  rm -rf "$(go env GOPATH)/pkg/mod" ; \
   for group in "${GROUPS_ARR[@]}";do \
   getent group "${group}" > /dev/null 2>&1 && usermod -aG "${group}" "${USER}" || continue ; \
   done ; \
@@ -793,7 +808,7 @@ RUN \
   go clean -cache ; \
   su-exec "${USER}" go clean -cache ; \
   done ; \
-  rm -rf "${HOME}/go/pkg/mod" ; \
+  rm -rf "$(go env GOPATH)/pkg/mod" ; \
   for group in "${GROUPS_ARR[@]}";do \
   getent group "${group}" > /dev/null 2>&1 && usermod -aG "${group}" "${USER}" || continue ; \
   done ; \
@@ -814,12 +829,16 @@ RUN \
 # "extra/aws-cli-v2" \
 USER "root"
 RUN \
+  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
+  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
 export PIP_NO_CACHE_DIR="off" ; \
 export MAKEFLAGS="-j$(nproc)" ; \
 export CGO_ENABLED=1 ; \
 export CGO_LDFLAGS="-g -O2" ; \
-pacman -Syyu --noconfirm \
-&& paru -Sy --noconfirm --needed \
+mkdir -p "${HOME}/.local/state/paru" \
+&& chown -R "$(id -u "${USER}"):$(id -g "${USER}")" \
+  "${WORKDIR}" "${HOME}" \
+&& paru -S --noconfirm --needed \
   "markdownlint" \
   "consul-template" \
   "packer" \
@@ -851,7 +870,6 @@ pacman -Syyu --noconfirm \
   "prettier" \
   "entr" \
   "podman" \
-  "docker-buildx" \
   "docker-machine" \
   "docker-scan" \
   "docker-compose" \
@@ -915,6 +933,12 @@ pacman -Syyu --noconfirm \
   "aur/dockerfile-language-server-bin" \
   "aur/terraform-ls-bin" \
   && curl -fsSL "https://plandex.ai/install.sh" | bash > /dev/null 2>&1 \
+  && go install \
+    "github.com/Gelio/go-global-update@latest" \
+  && go clean -modcache > /dev/null 2>&1 \
+  && su-exec "${USER}" go clean -modcache > /dev/null 2>&1 \
+  && go clean -cache > /dev/null 2>&1 \
+  && su-exec "${USER}" go clean -cache > /dev/null 2>&1 \
   && compress-packages ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                   user profile config                    │
@@ -964,6 +988,8 @@ RUN \
   && chmod +x /usr/local/share/fix-ssh-permissions.sh  ;
 # hadolint ignore=SC2016,SC2046
 RUN \
+  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
+  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   ln -sf "/usr/share/zoneinfo/America/New_York" "/etc/localtime" ; \
   chown "$(id -u "${USER}"):$(id -g "${USER}")" -R  "${WORKDIR}" "${HOME}" ; \
   [ "$(pacman -Qdtq)" != "" ] && pacman -Rs $(pacman -Qdtq) ; \
@@ -972,7 +998,7 @@ RUN \
   su-exec "${USER}" go clean -modcache ; \
   go clean -cache ; \
   su-exec "${USER}" go clean -cache ; \
-  rm -rf /tmp/* ;
+  rm -rf /tmp/* "${HOME}/.cache" ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │              vscode-server 'offline' setup               │
 #  ╰──────────────────────────────────────────────────────────╯

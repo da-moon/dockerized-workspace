@@ -8,16 +8,24 @@ tasks:
     openMode: tab-before
     command: |
       set -euo pipefail ;
-      if paru --version > /dev/null 2>&1 ; then
-        paru -Syyu --removemake --cleanafter --noconfirm ;
-        [ -d "${HOME}/.cache/paru/clone/" ] ;
-        /bin/rm -rf "${HOME}/.cache/paru/clone" ;
-        mkdir -p "${HOME}/.cache/paru/clone/" ;
-        exit 0 ;
-      fi
-      sudo pacman -Syyu --noconfirm ;
-      if aura --version > /dev/null 2>&1 ; then
-        sudo aura -Ayyuxac --noconfirm --skipinteg --skippgpcheck ;
+      if [ -x "$(command -v topgrade)" ]; then
+        topgrade \
+        --disable "vscode" \
+        --env "CGO_ENABLED=1" \
+        --env "CGO_LDFLAGS='-g -O2'" \
+        --yes --skip-notify --no-retry --cleanup ;
+      else
+        if paru --version > /dev/null 2>&1 ; then
+          paru -Syyu --removemake --cleanafter --noconfirm ;
+          [ -d "${HOME}/.cache/paru/clone/" ] ;
+          /bin/rm -rf "${HOME}/.cache/paru/clone" ;
+          mkdir -p "${HOME}/.cache/paru/clone/" ;
+          exit 0 ;
+        fi
+        sudo pacman -Syyu --noconfirm ;
+        if aura --version > /dev/null 2>&1 ; then
+          sudo aura -Ayyuxac --noconfirm --skipinteg --skippgpcheck ;
+        fi
       fi
       exit 0 ;
   - name: ensure-just-is-installed
