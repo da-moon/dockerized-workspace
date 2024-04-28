@@ -148,97 +148,97 @@ RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   pacman --quiet --noprogressbar -S --noconfirm --needed \
-    "base-devel" \
-    "upx" \
-    "git" \
-    "openssh" \
-    "man-db" \
-    "wget" \
-    "curl" \
-    "jq" \
-    "unzip" \
-    "unrar" \
-    "expac" \
-    "bash-completion" \
+  "base-devel" \
+  "upx" \
+  "git" \
+  "openssh" \
+  "man-db" \
+  "wget" \
+  "curl" \
+  "jq" \
+  "unzip" \
+  "unrar" \
+  "expac" \
+  "bash-completion" \
   # ─── GIT CONFIG ───────────────────────────────────────────────────────────
   && git --version > /dev/null 2>&1 && ( \
-    git config --system 'format.signoff'                                  'true' ; \
-    git config --system 'init.defaultBranch'                              'master' ; \
-    git config --system 'core.attributesfile'                             '.gitattributes' ; \
-    git config --system 'core.autocrlf'                                   'false' ; \
-    git config --system 'tag.forceSignAnnotated'                          'true' ; \
-    git config --system 'push.recursesubmodules'                          'on-demand' ; \
-    git config --system 'pull.rebase'                                     'true' ; \
-    git config --system 'rebase.autostash'                                'true' ; \
-    git config --system 'status.submodulesummary'                         'true' ; \
-    git config --system 'pager.diff'                                      '[ -x "$(command -v delta)" ] && delta || less --tab=2 -RFX' ; \
-    git config --system 'pager.grep'                                      '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
-    git config --system 'pager.blame'                                     '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
-    git config --system 'pager.log'                                       '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
-    git config --system 'pager.reflog'                                    '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
-    git config --system 'pager.show'                                      '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
-    git config --system 'diff.submodule'                                  'log' ; \
-    git config --system 'diff.tool'                                       'difftastic' ; \
-    git config --system 'diff.image.command'                              'compare $2 $1 png:- | montage -geometry +4+4 $2 - $1 png:- | display -title "$1"' ; \
-    git config --system 'diff.difftastic.command'                         'difft' ; \
-    git config --system 'diff.difftastic.binary'                          'true' ; \
-    git config --system 'difftool.prompt'                                 'false' ; \
-    git config --system 'difftool.difftastic.cmd'                         'difft --color always $LOCAL $REMOTE' ; \
-    git config --system 'difftool.delta.cmd'                              'diff -u --unified=3 --ignore-case -w $LOCAL $REMOTE | delta' ; \
-    git config --system 'gui.editor'                                      'code -w' ; \
-    git config --system 'fetch.prune'                                     'true' ; \
-    git config --system 'merge.log'                                       'true' ; \
-    git config --system 'merge.tool'                                      'code' ; \
-    git config --system 'mergetool.code.cmd'                              'code --wait --merge $REMOTE $LOCAL $BASE $MERGED' ; \
-    git config --system 'alias.view-contributors'                         'shortlog -e -s -n' ; \
-    git config --system 'alias.upstream'                                  'remote get-url origin' ; \
-    git config --system 'alias.root'                                      'rev-parse --show-toplevel' ; \
-    git config --system 'alias.scope'                                     'rev-parse --show-prefix' ; \
-    git config --system 'alias.url'                                       'ls-remote --get-url' ; \
-    git config --system 'alias.aliases'                                   'config --get-regexp alias' ; \
-    git config --system 'alias.spush'                                     'push --recurse-submodules=on-demand' ; \
-    git config --system 'alias.sfetch'                                    'submodule foreach --recursive git fetch' ; \
-    git config --system 'alias.supdate'                                   'submodule update --remote --merge' ; \
-    git config --system 'alias.default-branch'                            'rev-parse --abbrev-ref HEAD' ; \
-    git config --system 'alias.current-branch'                            '!git for-each-ref --format="%(upstream:short)" $(git symbolic-ref -q HEAD)' ; \
-    git config --system 'alias.branch-prune'                              '!git fetch -p && for b in $(git for-each-ref --format="%(if:equals=[gone])%(upstream:track)%(then)%(refname:short)%(end)" refs/heads); do git branch -d $b; done' ; \
-    git config --system 'alias.ca'                                        'commit --signoff --gpg-sign --amend --reuse-message=HEAD' ; \
-    git config --system 'alias.c'                                         'commit --signoff --gpg-sign' ; \
-    git config --system 'alias.cF'                                        '!git commit --signoff --gpg-sign --file=$(git rev-parse --show-toplevel)/.git/COMMIT_EDITMSG' ; \
-    git config --system 'alias.codegpt'                                   '! codegpt commit --preview' ; \
-    git config --system 'alias.commit-edit-message'                       '! $EDITOR $(git rev-parse --show-toplevel)/.git/COMMIT_EDITMSG' ; \
-    git config --system 'alias.commit-summary'                            'log --color --graph --pretty=format:"%C(red)%h%C(reset) %s %C(bold blue)[%an](mailto:%ae)%C(reset) %C(green)%C(bold)%cr" --abbrev-commit' ; \
-    git config --system 'alias.head-hash'                                 'rev-parse HEAD' ; \
-    git config --system 'alias.latest-commit'                             'log -1 HEAD --stat' ; \
-    git config --system 'alias.untracked'                                 'ls-files --others --exclude-standard' ; \
-    git config --system 'alias.tracked'                                   '!git ls-tree -r $(git symbolic-ref --quiet --short HEAD || git rev-parse HEAD) --name-only' ; \
-    git config --system 'alias.tags'                                      'for-each-ref --format="%(refname:short) (%(committerdate:relative))" --sort=committerdate refs/tags' ; \
-    git config --system 'alias.latest-tag'                                '!git describe --tags $(git rev-list --tags --max-count=1 2>/dev/null) 2>/dev/null' ; \
-    git config --system 'alias.release-notes'                             'log --color --pretty=format:"* %C(red)%h%C(reset) %s %C(bold blue)[%an](mailto:%ae)%C(reset)" --abbrev-commit --dense --no-merges' ; \
-    git config --system 'alias.staged'                                    'diff --name-only --staged' ; \
-    git config --system 'alias.re-stage'                                  'git add $(git diff --name-only --staged)' ; \
-    git config --system 'alias.difft'                                     'difftool --tool difftastic' ; \
-    git config --system 'alias.diffd'                                     'difftool --tool delta' ; \
-    git config --system 'alias.not-staged'                                'diff-files --name-only -B -R -M' ; \
-    git config --system 'alias.all-changes'                               'diff --name-only HEAD' ; \
-    git config --system 'alias.ui'                                        '!f() { cd "$(git rev-parse --show-toplevel)" && gitui; }; f' ; \
-    git config --system 'alias.zipball'                                   '!git archive --format=zip --output=$(basename -s.git $(git remote get-url origin))-$(git describe --abbrev=0).zip $(git describe --abbrev=0)' ; \
-    git config --system 'alias.tarball'                                   '!git archive --format=tar.gz --output=$(basename -s.git $(git remote get-url origin))-$(git describe --abbrev=0).tar.gz $(git describe --abbrev=0)' ; \
-    git config --system 'alias.conflicts'                                 '! $EDITOR $(git diff --name-only --diff-filter=U)' ; \
-    git config --system 'alias.issues'                                    '! gh issue list --assignee "@me"' ; \
-    git config --system 'alias.changes'                                   'diff-index --name-only -B -R -M -C HEAD' ; \
-    git config --system 'alias.rel-changes'                               'ls-files -m -o --exclude-standard' ; \
-    git config --system 'alias.ignored'                                   'ls-files --others --ignored --exclude-standard' ; \
-    git config --system 'alias.modified-files'                            'diff --name-only' ; \
-    git config --system 'alias.restage'                                   '!git add $(git diff --name-only)' ; \
-    git config --system 'alias.stage-all'                                 '!git add $(git diff --name-only HEAD)' ; \
-    git config --system "alias.next-patch-release"                        '!git describe --tags $(git rev-list --tags --max-count=1 2>/dev/null) 2>/dev/null'"| awk -F. '{gsub(\"v\",\"\",\$1);printf \"%s.%s.%s\", \$1,\$2,\$3+1}END {if (NR==0){print \"0.0.1\"}}'" ; \
-    git config --system "alias.next-minor-release"                        '!git describe --tags $(git rev-list --tags --max-count=1 2>/dev/null) 2>/dev/null'"| awk -F. '{gsub(\"v\",\"\",\$1);printf \"%s.%s.0\", \$1,\$2+1}END {if (NR==0){print \"0.0.1\"}}'" ; \
-    git config --system "alias.next-major-release"                        '!git describe --tags $(git rev-list --tags --max-count=1 2>/dev/null) 2>/dev/null'"| awk -F. '{gsub(\"v\",\"\",\$1);printf \"%s.0.0\", \$1+1}END {if (NR==0){print \"0.0.1\"}}'" ; \
-    git config --system 'alias.fa'                                        '!f() { cd "$(git rev-parse --show-toplevel)" && git ls-files -m -o --exclude-standard | fzf -0 --print0 --multi --reverse --height=40% --tabstop=2 --prompt=" │ " --color="prompt:0,hl:178,hl+:178" --preview-window="right:60%" --height="80%" --bind="tab:ignore" --bind="shift-tab:ignore" --bind="ctrl-t:ignore" --bind="ctrl-g:ignore" --bind="right:toggle+down" --bind="left:toggle+up" --bind="ctrl-space:select-all" --bind="alt-space:deselect-all" --preview="git difftool --tool=delta  {}" | xargs -0 -t -o -I {} git add "{}";  }; f' ; \
-    git config --system "alias.spark"                                     '!git log --date=short --pretty=format:%ad | sort | uniq -c | awk "{print $1}" | spark' ; \
-    git config --system "alias.commit-count"                              '!git log --date=short --pretty=format:%ad | sort | uniq -c' ; \
-    git config --system "alias.commit-count-ordered"                      '!git log --date=short --pretty=format:%ad | sort | uniq -c | sort -r | head' ; \
+  git config --system 'format.signoff'                                  'true' ; \
+  git config --system 'init.defaultBranch'                              'master' ; \
+  git config --system 'core.attributesfile'                             '.gitattributes' ; \
+  git config --system 'core.autocrlf'                                   'false' ; \
+  git config --system 'tag.forceSignAnnotated'                          'true' ; \
+  git config --system 'push.recursesubmodules'                          'on-demand' ; \
+  git config --system 'pull.rebase'                                     'true' ; \
+  git config --system 'rebase.autostash'                                'true' ; \
+  git config --system 'status.submodulesummary'                         'true' ; \
+  git config --system 'pager.diff'                                      '[ -x "$(command -v delta)" ] && delta || less --tab=2 -RFX' ; \
+  git config --system 'pager.grep'                                      '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
+  git config --system 'pager.blame'                                     '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
+  git config --system 'pager.log'                                       '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
+  git config --system 'pager.reflog'                                    '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
+  git config --system 'pager.show'                                      '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
+  git config --system 'diff.submodule'                                  'log' ; \
+  git config --system 'diff.tool'                                       'difftastic' ; \
+  git config --system 'diff.image.command'                              'compare $2 $1 png:- | montage -geometry +4+4 $2 - $1 png:- | display -title "$1"' ; \
+  git config --system 'diff.difftastic.command'                         'difft' ; \
+  git config --system 'diff.difftastic.binary'                          'true' ; \
+  git config --system 'difftool.prompt'                                 'false' ; \
+  git config --system 'difftool.difftastic.cmd'                         'difft --color always $LOCAL $REMOTE' ; \
+  git config --system 'difftool.delta.cmd'                              'diff -u --unified=3 --ignore-case -w $LOCAL $REMOTE | delta' ; \
+  git config --system 'gui.editor'                                      'code -w' ; \
+  git config --system 'fetch.prune'                                     'true' ; \
+  git config --system 'merge.log'                                       'true' ; \
+  git config --system 'merge.tool'                                      'code' ; \
+  git config --system 'mergetool.code.cmd'                              'code --wait --merge $REMOTE $LOCAL $BASE $MERGED' ; \
+  git config --system 'alias.view-contributors'                         'shortlog -e -s -n' ; \
+  git config --system 'alias.upstream'                                  'remote get-url origin' ; \
+  git config --system 'alias.root'                                      'rev-parse --show-toplevel' ; \
+  git config --system 'alias.scope'                                     'rev-parse --show-prefix' ; \
+  git config --system 'alias.url'                                       'ls-remote --get-url' ; \
+  git config --system 'alias.aliases'                                   'config --get-regexp alias' ; \
+  git config --system 'alias.spush'                                     'push --recurse-submodules=on-demand' ; \
+  git config --system 'alias.sfetch'                                    'submodule foreach --recursive git fetch' ; \
+  git config --system 'alias.supdate'                                   'submodule update --remote --merge' ; \
+  git config --system 'alias.default-branch'                            'rev-parse --abbrev-ref HEAD' ; \
+  git config --system 'alias.current-branch'                            '!git for-each-ref --format="%(upstream:short)" $(git symbolic-ref -q HEAD)' ; \
+  git config --system 'alias.branch-prune'                              '!git fetch -p && for b in $(git for-each-ref --format="%(if:equals=[gone])%(upstream:track)%(then)%(refname:short)%(end)" refs/heads); do git branch -d $b; done' ; \
+  git config --system 'alias.ca'                                        'commit --signoff --gpg-sign --amend --reuse-message=HEAD' ; \
+  git config --system 'alias.c'                                         'commit --signoff --gpg-sign' ; \
+  git config --system 'alias.cF'                                        '!git commit --signoff --gpg-sign --file=$(git rev-parse --show-toplevel)/.git/COMMIT_EDITMSG' ; \
+  git config --system 'alias.codegpt'                                   '! codegpt commit --preview' ; \
+  git config --system 'alias.commit-edit-message'                       '! $EDITOR $(git rev-parse --show-toplevel)/.git/COMMIT_EDITMSG' ; \
+  git config --system 'alias.commit-summary'                            'log --color --graph --pretty=format:"%C(red)%h%C(reset) %s %C(bold blue)[%an](mailto:%ae)%C(reset) %C(green)%C(bold)%cr" --abbrev-commit' ; \
+  git config --system 'alias.head-hash'                                 'rev-parse HEAD' ; \
+  git config --system 'alias.latest-commit'                             'log -1 HEAD --stat' ; \
+  git config --system 'alias.untracked'                                 'ls-files --others --exclude-standard' ; \
+  git config --system 'alias.tracked'                                   '!git ls-tree -r $(git symbolic-ref --quiet --short HEAD || git rev-parse HEAD) --name-only' ; \
+  git config --system 'alias.tags'                                      'for-each-ref --format="%(refname:short) (%(committerdate:relative))" --sort=committerdate refs/tags' ; \
+  git config --system 'alias.latest-tag'                                '!git describe --tags $(git rev-list --tags --max-count=1 2>/dev/null) 2>/dev/null' ; \
+  git config --system 'alias.release-notes'                             'log --color --pretty=format:"* %C(red)%h%C(reset) %s %C(bold blue)[%an](mailto:%ae)%C(reset)" --abbrev-commit --dense --no-merges' ; \
+  git config --system 'alias.staged'                                    'diff --name-only --staged' ; \
+  git config --system 'alias.re-stage'                                  'git add $(git diff --name-only --staged)' ; \
+  git config --system 'alias.difft'                                     'difftool --tool difftastic' ; \
+  git config --system 'alias.diffd'                                     'difftool --tool delta' ; \
+  git config --system 'alias.not-staged'                                'diff-files --name-only -B -R -M' ; \
+  git config --system 'alias.all-changes'                               'diff --name-only HEAD' ; \
+  git config --system 'alias.ui'                                        '!f() { cd "$(git rev-parse --show-toplevel)" && gitui; }; f' ; \
+  git config --system 'alias.zipball'                                   '!git archive --format=zip --output=$(basename -s.git $(git remote get-url origin))-$(git describe --abbrev=0).zip $(git describe --abbrev=0)' ; \
+  git config --system 'alias.tarball'                                   '!git archive --format=tar.gz --output=$(basename -s.git $(git remote get-url origin))-$(git describe --abbrev=0).tar.gz $(git describe --abbrev=0)' ; \
+  git config --system 'alias.conflicts'                                 '! $EDITOR $(git diff --name-only --diff-filter=U)' ; \
+  git config --system 'alias.issues'                                    '! gh issue list --assignee "@me"' ; \
+  git config --system 'alias.changes'                                   'diff-index --name-only -B -R -M -C HEAD' ; \
+  git config --system 'alias.rel-changes'                               'ls-files -m -o --exclude-standard' ; \
+  git config --system 'alias.ignored'                                   'ls-files --others --ignored --exclude-standard' ; \
+  git config --system 'alias.modified-files'                            'diff --name-only' ; \
+  git config --system 'alias.restage'                                   '!git add $(git diff --name-only)' ; \
+  git config --system 'alias.stage-all'                                 '!git add $(git diff --name-only HEAD)' ; \
+  git config --system "alias.next-patch-release"                        '!git describe --tags $(git rev-list --tags --max-count=1 2>/dev/null) 2>/dev/null'"| awk -F. '{gsub(\"v\",\"\",\$1);printf \"%s.%s.%s\", \$1,\$2,\$3+1}END {if (NR==0){print \"0.0.1\"}}'" ; \
+  git config --system "alias.next-minor-release"                        '!git describe --tags $(git rev-list --tags --max-count=1 2>/dev/null) 2>/dev/null'"| awk -F. '{gsub(\"v\",\"\",\$1);printf \"%s.%s.0\", \$1,\$2+1}END {if (NR==0){print \"0.0.1\"}}'" ; \
+  git config --system "alias.next-major-release"                        '!git describe --tags $(git rev-list --tags --max-count=1 2>/dev/null) 2>/dev/null'"| awk -F. '{gsub(\"v\",\"\",\$1);printf \"%s.0.0\", \$1+1}END {if (NR==0){print \"0.0.1\"}}'" ; \
+  git config --system 'alias.fa'                                        '!f() { cd "$(git rev-parse --show-toplevel)" && git ls-files -m -o --exclude-standard | fzf -0 --print0 --multi --reverse --height=40% --tabstop=2 --prompt=" │ " --color="prompt:0,hl:178,hl+:178" --preview-window="right:60%" --height="80%" --bind="tab:ignore" --bind="shift-tab:ignore" --bind="ctrl-t:ignore" --bind="ctrl-g:ignore" --bind="right:toggle+down" --bind="left:toggle+up" --bind="ctrl-space:select-all" --bind="alt-space:deselect-all" --preview="git difftool --tool=delta  {}" | xargs -0 -t -o -I {} git add "{}";  }; f' ; \
+  git config --system "alias.spark"                                     '!git log --date=short --pretty=format:%ad | sort | uniq -c | awk "{print $1}" | spark' ; \
+  git config --system "alias.commit-count"                              '!git log --date=short --pretty=format:%ad | sort | uniq -c' ; \
+  git config --system "alias.commit-count-ordered"                      '!git log --date=short --pretty=format:%ad | sort | uniq -c | sort -r | head' ; \
   ) || exit 1 ; \
   compress-packages ;
 #  ╭──────────────────────────────────────────────────────────╮
@@ -358,20 +358,21 @@ RUN \
   #  │                     go setup                             │
   #  ╰──────────────────────────────────────────────────────────╯
   go version > /dev/null 2>&1 && ( \
-    echo 'export PATH="${PATH}:$(go env GOPATH)/bin";' ; \
+  echo 'export PATH="${PATH}:$(go env GOPATH)/bin";' ; \
   ) | tee "/etc/profile.d/go.sh" > /dev/null || exit 1 ; \
   #  ╭──────────────────────────────────────────────────────────╮
   #  │                     ruby setup                           │
   #  ╰──────────────────────────────────────────────────────────╯
   gem --version > /dev/null 2>&1 && ( \
-    echo 'export GEM_HOME="$(ruby -e "puts Gem.user_dir")";' ; \
-    echo 'export PATH="${PATH}:${GEM_HOME}/bin";' ; \
+  echo "export GEM_PATH="${GEM_PATH}";" ; \
+  echo 'export GEM_HOME="$(ruby -e "puts Gem.user_dir")";' ; \
+  echo 'export PATH="${PATH}:${GEM_HOME}/bin";' ; \
   ) | tee "/etc/profile.d/ruby.sh" > /dev/null || exit 1 ; \
   #  ╭──────────────────────────────────────────────────────────╮
   #  │                     python setup                         │
   #  ╰──────────────────────────────────────────────────────────╯
   poetry --version > /dev/null 2>&1 && ( \
-    echo 'eval "$(poetry completions bash)" ;' ; \
+  echo 'eval "$(poetry completions bash)" ;' ; \
   ) | tee "/etc/profile.d/poetry.sh" > /dev/null || exit 1 ; \
   #  ╭──────────────────────────────────────────────────────────╮
   #  │                 nodejs setup                             │
@@ -380,41 +381,42 @@ RUN \
   #  │                 powershell init                          │
   #  ╰──────────────────────────────────────────────────────────╯
   pwsh --version > /dev/null 2>&1 && ( \
-    pwsh -c '$parent=Split-Path -parent $PROFILE ; if (-not(Test-Path -Path $parent -PathType Container)) {$null = New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop}' ; \
+  pwsh -c '$parent=Split-Path -parent $PROFILE ; if (-not(Test-Path -Path $parent -PathType Container)) {$null = New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop}' ; \
   ) || exit 1 ; \
   # ─── USE DELTA FOR GIT DIFFS ────────────────────────────────────────────────────
   delta --version > /dev/null 2>&1 && ( \
-    git config --system pager.diff delta \
-    && git config --system pager.log delta \
-    && git config --system pager.reflog delta \
-    && git config --system pager.show delta \
-    && git config --system interactive.difffilter "delta --color-only --features=interactive" \
-    && git config --system delta.features "side-by-side line-numbers decorations" \
-    && git config --system delta.whitespace-error-style "22 reverse" \
-    && git config --system delta.decorations.commit-decoration-style "bold yellow box ul" \
-    && git config --system delta.decorations.file-style "bold yellow ul" \
-    && git config --system delta.decorations.file-decoration-style "none" \
-    && git config --system delta.decorations.commit-style "raw" \
-    && git config --system delta.decorations.hunk-header-decoration-style "blue box" \
-    && git config --system delta.decorations.hunk-header-file-style "red" \
-    && git config --system delta.decorations.hunk-header-line-number-style "#067a00" \
-    && git config --system delta.decorations.hunk-header-style "file line-number syntax" \
-    && git config --system delta.interactive.keep-plus-minus-markers "false" \
+  git config --system pager.diff delta \
+  && git config --system pager.log delta \
+  && git config --system pager.reflog delta \
+  && git config --system pager.show delta \
+  && git config --system interactive.difffilter "delta --color-only --features=interactive" \
+  && git config --system delta.features "side-by-side line-numbers decorations" \
+  && git config --system delta.whitespace-error-style "22 reverse" \
+  && git config --system delta.decorations.commit-decoration-style "bold yellow box ul" \
+  && git config --system delta.decorations.file-style "bold yellow ul" \
+  && git config --system delta.decorations.file-decoration-style "none" \
+  && git config --system delta.decorations.commit-style "raw" \
+  && git config --system delta.decorations.hunk-header-decoration-style "blue box" \
+  && git config --system delta.decorations.hunk-header-file-style "red" \
+  && git config --system delta.decorations.hunk-header-line-number-style "#067a00" \
+  && git config --system delta.decorations.hunk-header-style "file line-number syntax" \
+  && git config --system delta.interactive.keep-plus-minus-markers "false" \
   ) || exit 1 ; \
   go-task --version > /dev/null 2>&1 && ( \
-    ln -sf "$(which "go-task" 2>/dev/null)" "/usr/local/bin/task" ; \
+  ln -sf "$(which "go-task" 2>/dev/null)" "/usr/local/bin/task" ; \
   ) || exit 1 ; \
   starship --version > /dev/null 2>&1 && echo 'eval "$(starship init bash)" ;' > "/etc/profile.d/starship.sh" || exit 1 ; \
   yq --version > /dev/null 2>&1 && echo 'eval "$(yq shell-completion bash)" ;' > "/etc/profile.d/yq.sh" || exit 1 ; \
   just --version > /dev/null 2>&1 && ( \
-    echo 'eval "$(just --completions bash)" ;' > "/etc/profile.d/just.sh" ; \
+  echo 'eval "$(just --completions bash)" ;' > "/etc/profile.d/just.sh" ; \
   ) || exit 1 ; \
   zoxide --version > /dev/null 2>&1 && ( \
-    ( \
-      echo '[ ! -d "${_ZO_DATA_DIR}" ] && mkdir "${_ZO_DATA_DIR}" ;' ; \
-      echo 'eval "$(zoxide init bash)" ;' ; \
-      echo 'alias cd="z"' ; \
-    ) | tee "/etc/profile.d/zoxide.sh" > /dev/null || exit 1 ; \
+  ( \
+  echo "export _ZO_DATA_DIR="${_ZO_DATA_DIR}";" ; \
+  echo '[ ! -d "${_ZO_DATA_DIR}" ] && mkdir "${_ZO_DATA_DIR}" ;' ; \
+  echo 'eval "$(zoxide init bash)" ;' ; \
+  echo 'alias cd="z"' ; \
+  ) | tee "/etc/profile.d/zoxide.sh" > /dev/null || exit 1 ; \
   ) || exit 1 ; \
   bat --version > /dev/null 2>&1 && ( \
   echo 'alias cat="bat -pp" ;' ; \
@@ -428,50 +430,50 @@ RUN \
   echo 'alias ls="eza" ;' ; \
   ) | tee "/etc/profile.d/eza.sh" > /dev/null || exit 1 ; \
   gh --version > /dev/null 2>&1 && ( \
-    echo 'eval "$(gh completion -s bash)" ;' > "/etc/profile.d/gh.sh" ; \
-    pwsh --version && ( \
-    pwsh -c ' \
-    Invoke-Expression -Command $(gh completion -s powershell | Out-String) | Out-File -Append -Encoding ascii "$PROFILE" \
-    ' ; \
-    ) || exit 0 ; \
+  echo 'eval "$(gh completion -s bash)" ;' > "/etc/profile.d/gh.sh" ; \
+  pwsh --version && ( \
+  pwsh -c ' \
+  Invoke-Expression -Command $(gh completion -s powershell | Out-String) | Out-File -Append -Encoding ascii "$PROFILE" \
+  ' ; \
+  ) || exit 0 ; \
   ) || exit 1 ; \
   atuin --version > /dev/null 2>&1 && ( \
-    echo '[ ! -d "${HOME}/.config/atuin" ] && mkdir "${HOME}/.config/atuin" ;' ; \
-    echo 'wget -qO "${HOME}/.config/atuin/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/atuin/config.toml" ;' ; \
-    echo 'sed -i "/db_path/d" "${HOME}/.config/atuin/config.toml"' ; \
-    echo "echo 'db_path = \"${WORKDIR}/.history.db\"' >> '${HOME}/.config/atuin/config.toml' ;" ; \
-    echo '[[ -r "/usr/share/bash-preexec/bash-preexec.sh" ]] && source "/usr/share/bash-preexec/bash-preexec.sh"' ; \
-    echo 'eval "$(atuin init bash)" ;' ; \
+  echo '[ ! -d "${HOME}/.config/atuin" ] && mkdir "${HOME}/.config/atuin" ;' ; \
+  echo 'wget -qO "${HOME}/.config/atuin/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/atuin/config.toml" ;' ; \
+  echo 'sed -i -e "/db_path/d" "${HOME}/.config/atuin/config.toml" ;' ; \
+  echo "echo 'db_path = \"${WORKDIR}/.history.db\"' >> '${HOME}/.config/atuin/config.toml' ;" ; \
+  echo '[[ -r "/usr/share/bash-preexec/bash-preexec.sh" ]] && source "/usr/share/bash-preexec/bash-preexec.sh"' ; \
+  echo 'eval "$(atuin init bash)" ;' ; \
   ) | tee "/etc/profile.d/atuin.sh" > /dev/null || exit 1 ; \
   xplr --version > /dev/null 2>&1 && ( \
-    echo '[ ! -d "${HOME}/.config/xplr" ] && mkdir -p "${HOME}/.config/xplr" ;' ; \
-    echo 'wget -qO "${HOME}/.config/xplr/init.lua" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/xplr/init.lua" ;' ; \
+  echo '[ ! -d "${HOME}/.config/xplr" ] && mkdir -p "${HOME}/.config/xplr" ;' ; \
+  echo 'wget -qO "${HOME}/.config/xplr/init.lua" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/xplr/init.lua" ;' ; \
   ) | tee "/etc/profile.d/xplr.sh" > /dev/null  || exit 1 ; \
   fzf --version > /dev/null 2>&1 && ( \
-    echo '_fzf_complete_make() {' ; \
-    echo '  FZF_COMPLETION_TRIGGER="" _fzf_complete "-1" "${@}" < <(make -pqr 2>/dev/null \' ; \
-    echo '  | awk -F":" "/^[a-zA-Z0-9][^\$#\/\t=]*:([^=]|\$)/ {split(\$1,A,/ /);for(i in A)print A[i]}" \' ; \
-    echo '  | grep -v Makefile \' ; \
-    echo '  | sort -u)' ; \
-    echo '}' ; \
-    echo '[[ -n ${BASH} ]] && complete -F _fzf_complete_make -o default -o bashdefault make' ; \
-    echo '[ -r "/usr/share/fzf/key-bindings.bash" ] && source "/usr/share/fzf/key-bindings.bash"' ; \
-    echo '[ -r "/usr/share/fzf/completion.bash" ] && source "/usr/share/fzf/completion.bash"' ; \
-    echo '[ -r "/usr/share/fzf/fzf-extras.bash" ] && source "/usr/share/fzf/fzf-extras.bash"' ; \
+  echo '_fzf_complete_make() {' ; \
+  echo '  FZF_COMPLETION_TRIGGER="" _fzf_complete "-1" "${@}" < <(make -pqr 2>/dev/null \' ; \
+  echo '  | awk -F":" "/^[a-zA-Z0-9][^\$#\/\t=]*:([^=]|\$)/ {split(\$1,A,/ /);for(i in A)print A[i]}" \' ; \
+  echo '  | grep -v Makefile \' ; \
+  echo '  | sort -u)' ; \
+  echo '}' ; \
+  echo '[[ -n ${BASH} ]] && complete -F _fzf_complete_make -o default -o bashdefault make' ; \
+  echo '[ -r "/usr/share/fzf/key-bindings.bash" ] && source "/usr/share/fzf/key-bindings.bash"' ; \
+  echo '[ -r "/usr/share/fzf/completion.bash" ] && source "/usr/share/fzf/completion.bash"' ; \
+  echo '[ -r "/usr/share/fzf/fzf-extras.bash" ] && source "/usr/share/fzf/fzf-extras.bash"' ; \
   ) | tee "/etc/profile.d/fzf.sh" > /dev/null || exit 1 ; \
   ( \
-    echo 'if hx --version > /dev/null 2>&1 ; then' ;\
-    echo '  export EDITOR="hx" ;' ;\
-    echo '  export VISUAL="hx" ;' ;\
-    echo '  [ ! -d "${HOME}/.config/helix" ] && mkdir "${HOME}/.config/helix" ;' ; \
-    echo '  wget -qO "${HOME}/.config/helix/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/helix/config.toml" ;' ; \
-    echo 'fi' ;\
+  echo 'if hx --version > /dev/null 2>&1 ; then' ;\
+  echo '  export EDITOR="hx" ;' ;\
+  echo '  export VISUAL="hx" ;' ;\
+  echo '  [ ! -d "${HOME}/.config/helix" ] && mkdir "${HOME}/.config/helix" ;' ; \
+  echo '  wget -qO "${HOME}/.config/helix/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/helix/config.toml" ;' ; \
+  echo 'fi' ;\
   ) | tee "/etc/profile.d/editor.sh" > /dev/null || exit 1 ; \
   # NOTE: ensures shell always has the latest gipod variables
   ( \
-    echo 'if gp version > /dev/null 2>&1 ; then' ;\
-    echo '  eval "$(gp env --export)" ;' ;\
-    echo 'fi' ;\
+  echo 'if gp version > /dev/null 2>&1 ; then' ;\
+  echo '  eval "$(gp env --export)" ;' ;\
+  echo 'fi' ;\
   ) | tee "/etc/profile.d/gitpod.sh" > /dev/null || exit 1 ; \
   echo '[ -r "${HOME}/.local/share/bash-completion/completions/git-forgit.bash" ] && source "${HOME}/.local/share/bash-completion/completions/git-forgit.bash"' > "/etc/profile.d/forgit.sh" > /dev/null || exit 1 ; \
   compress-packages ;
@@ -493,27 +495,27 @@ RUN \
   # https://stackoverflow.com/questions/28227739/lock-a-file-in-bash-using-flock-and-lockfile
   #  ────────────────────────────────────────────────────────────
   rustup --version > /dev/null 2>&1 && ( \
-    echo '(' ; \
-    echo '  flock -x -n 3 || exit 55 ;' ; \
-    echo '  ! ( rustup toolchain list | grep -q "nightly" ) && rustup toolchain install nightly ;' ; \
-    echo ') 3> "/tmp/rust-nightly.lock"' ; \
-    echo '(' ; \
-    echo '  flock -x -n 4 || exit 55 ;' ; \
-    echo '  ! ( rustup toolchain list | grep -q "stable" ) && (rustup toolchain install stable && rustup default stable );' ; \
-    echo ') 4> "/tmp/rust-stable.lock"' ; \
-    echo '{' ; \
-    echo '  flock -s 3 ;' ; \
-    echo '  flock -u 3 ;' ; \
-    echo '} 3<"/tmp/rust-nightly.lock" ;' ; \
-    echo '{' ; \
-    echo '  flock -s 4 ;' ; \
-    echo '  flock -u 4 ;' ; \
-    echo '} 4<"/tmp/rust-stable.lock"' ; \
-    echo '[ -r "/tmp/rust-nightly.lock" ] && rm "/tmp/rust-nightly.lock" ;' ; \
-    echo '[ -r "/tmp/rust-stable.lock" ] && rm "/tmp/rust-stable.lock" ;' ; \
-    echo 'export RUSTUP_HOME="${HOME}/.rustup";' ; \
-    echo 'export CARGO_HOME="${HOME}/.cargo";' ; \
-    echo 'export PATH="${PATH}:${CARGO_HOME}/bin";' ; \
+  echo '(' ; \
+  echo '  flock -x -n 3 || exit 55 ;' ; \
+  echo '  ! ( rustup toolchain list | grep -q "nightly" ) && rustup toolchain install nightly ;' ; \
+  echo ') 3> "/tmp/rust-nightly.lock"' ; \
+  echo '(' ; \
+  echo '  flock -x -n 4 || exit 55 ;' ; \
+  echo '  ! ( rustup toolchain list | grep -q "stable" ) && (rustup toolchain install stable && rustup default stable );' ; \
+  echo ') 4> "/tmp/rust-stable.lock"' ; \
+  echo '{' ; \
+  echo '  flock -s 3 ;' ; \
+  echo '  flock -u 3 ;' ; \
+  echo '} 3<"/tmp/rust-nightly.lock" ;' ; \
+  echo '{' ; \
+  echo '  flock -s 4 ;' ; \
+  echo '  flock -u 4 ;' ; \
+  echo '} 4<"/tmp/rust-stable.lock"' ; \
+  echo '[ -r "/tmp/rust-nightly.lock" ] && rm "/tmp/rust-nightly.lock" ;' ; \
+  echo '[ -r "/tmp/rust-stable.lock" ] && rm "/tmp/rust-stable.lock" ;' ; \
+  echo 'export RUSTUP_HOME="${HOME}/.rustup";' ; \
+  echo 'export CARGO_HOME="${HOME}/.cargo";' ; \
+  echo 'export PATH="${PATH}:${CARGO_HOME}/bin";' ; \
   ) | tee -a "/etc/profile.d/00-rust.sh" > /dev/null \
   && rustup default "stable" \
   # NOTE: shisho adds a lot to build time and I don't use it at
@@ -534,36 +536,36 @@ RUN \
   "prose" \
   "jaq" \
   && find "${CARGO_HOME}/bin" \
-    -type f \
-    -executable \
-    -exec sh -c "file -i '{}' |  grep -q -E 'application/x-(pie-)?executable; charset=binary'" \; \
-    -print \
-    | xargs \
-        -P `nproc` \
-        --no-run-if-empty \
-        bash -c ' \
-      for pkg do \
-          strip "$pkg" || true ; \
-          upx "$pkg" || true ; \
-      done' bash ; \
+  -type f \
+  -executable \
+  -exec sh -c "file -i '{}' |  grep -q -E 'application/x-(pie-)?executable; charset=binary'" \; \
+  -print \
+  | xargs \
+  -P `nproc` \
+  --no-run-if-empty \
+  bash -c ' \
+  for pkg do \
+  strip "$pkg" || true ; \
+  upx "$pkg" || true ; \
+  done' bash ; \
   # For fixing the following error:
   #
   # ❯ sudo su -
   # -bash: /etc/bash_completion.d/cargo: No such file or directory
   ( \
-    [ -d "/usr/share/bash-completion/completions" ] && ( \
-      ( [ ! -r "/usr/share/bash-completion/completions/cargo" ] && rustup completions bash cargo > "/usr/share/bash-completion/completions/cargo" || exit 0 ; ) ; \
-      ( [ ! -r "/usr/share/bash-completion/completions/rustup" ] && rustup completions bash rustup > "/usr/share/bash-completion/completions/rustup" || exit 0 ; ) ; \
-    ) || exit 0 ; \
+  [ -d "/usr/share/bash-completion/completions" ] && ( \
+  ( [ ! -r "/usr/share/bash-completion/completions/cargo" ] && rustup completions bash cargo > "/usr/share/bash-completion/completions/cargo" || exit 0 ; ) ; \
+  ( [ ! -r "/usr/share/bash-completion/completions/rustup" ] && rustup completions bash rustup > "/usr/share/bash-completion/completions/rustup" || exit 0 ; ) ; \
+  ) || exit 0 ; \
   ) ; \
   [ -r "${CARGO_HOME}/.crates.toml" ] && ( \
-    while read BIN; do \
-      ln -sf "$(which "${BIN}")" "/usr/local/bin/${BIN}" ; \
-    done < <(yq eval '.v1.*|sort|.[]' "${CARGO_HOME}/.crates.toml"); \
+  while read BIN; do \
+  ln -sf "$(which "${BIN}")" "/usr/local/bin/${BIN}" ; \
+  done < <(yq eval '.v1.*|sort|.[]' "${CARGO_HOME}/.crates.toml"); \
   ) || exit 0 \
   && cargo-cache --remove-dir "all" > /dev/null 2>&1 \
   && rustup toolchain list | cut -d' ' -f1 | xargs -r -I {} rustup --quiet toolchain uninstall {}  ; \
-  compress-packages ; 
+  compress-packages ;
 RUN du --human-readable --max-depth 1 "${HOME}" > /.rustup
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 install ruby packages                    │
@@ -588,7 +590,7 @@ RUN \
   "remark-preset-lint-recommended" \
   "remark-lint-list-item-indent" \
   "remark-reference-links" \
-&& npm cache clean --quiet --force 
+  && npm cache clean --quiet --force
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                      dev tools                           │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -650,7 +652,7 @@ RUN \
   echo '    flock -s 20 ;' ; \
   echo '    echo "[ $(basename -s.sh "${self}") ] : cleaning up self..." ;' ; \
   echo '    flock -u 20 ;' ; \
-  echo '    # rm "${self}" ;' ; \
+  echo '    rm "${self}" ;' ; \
   echo '  } 20<"${lockfile}"' ; \
   echo '  [ -r "${lockfile}" ] && rm "${lockfile}" ;' ; \
   echo 'fi' ; \
@@ -832,14 +834,14 @@ USER "root"
 RUN \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-export PIP_NO_CACHE_DIR="off" ; \
-export MAKEFLAGS="-j$(nproc)" ; \
-export CGO_ENABLED=1 ; \
-export CGO_LDFLAGS="-g -O2" ; \
-mkdir -p "${HOME}/.local/state/paru" \
-&& chown -R "$(id -u "${USER}"):$(id -g "${USER}")" \
+  export PIP_NO_CACHE_DIR="off" ; \
+  export MAKEFLAGS="-j$(nproc)" ; \
+  export CGO_ENABLED=1 ; \
+  export CGO_LDFLAGS="-g -O2" ; \
+  mkdir -p "${HOME}/.local/state/paru" \
+  && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" \
   "${WORKDIR}" "${HOME}" \
-&& paru -S --noconfirm --needed \
+  && paru -S --noconfirm --needed \
   "markdownlint" \
   "consul-template" \
   "packer" \
@@ -898,7 +900,7 @@ mkdir -p "${HOME}/.local/state/paru" \
   "marksman" \
   "cfssl"  \
   "chaotic-aur/google-cloud-cli" \
-&& su-exec "${USER}" paru -S --noconfirm --needed --removemake --cleanafter \
+  && su-exec "${USER}" paru -S --noconfirm --needed --removemake --cleanafter \
   "aur/devc-bin" \
   "aur/nodejs-cspell" \
   "aur/commitlint" \
@@ -934,7 +936,7 @@ mkdir -p "${HOME}/.local/state/paru" \
   "aur/terraform-ls-bin" \
   && curl -fsSL "https://plandex.ai/install.sh" | bash > /dev/null 2>&1 \
   && go install \
-    "github.com/Gelio/go-global-update@latest" \
+  "github.com/Gelio/go-global-update@latest" \
   && go clean -modcache > /dev/null 2>&1 \
   && su-exec "${USER}" go clean -modcache > /dev/null 2>&1 \
   && go clean -cache > /dev/null 2>&1 \
@@ -947,7 +949,7 @@ USER "${USER}"
 WORKDIR "${WORKDIR}"
 RUN \
   ( \
-  echo '[ -r "/entrypoint" ] && exec /entrypoint bash --login' ; \
+  echo '[ -r "/entrypoint" ] && exec /entrypoint sudo -i -u "${USER}"' ; \
   ) | tee "${HOME}/.bashrc" > /dev/null ; \
   # ─── SSH SETUP ──────────────────────────────────────────────────────────────────
   mkdir -p "${HOME}/.ssh" \
