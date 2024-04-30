@@ -15,6 +15,9 @@
 !/.github/CODEOWNERS
 !/.github/ISSUE_TEMPLATE/
 !/.github/ISSUE_TEMPLATE/*.md
+!/.github/ISSUE_TEMPLATES/*.yml
+!/.github/workflows/
+!/.github/workflows/*.yml
 #  ────────────────────────────────────────────────────────────────────
 !/.gitpod.yml
 !/.gp
@@ -25,6 +28,8 @@
 !/tasks/
 !/tasks/**/*.yaml
 !/Taskfile.yaml
+#  ────────────────────────────────────────────────────────────────────
+!/vendir.yml
 #  ────────────────────────────────────────────────────────────────────
 !/.editorconfig
 !/.gitignore
@@ -43,6 +48,7 @@
 !/Justfile
 !/Makefile
 !/Vagrantfile
+!/build.sh
 !/docker-bake.hcl
 !/CONTRIBUTING.md
 !/CHANGELOG.md

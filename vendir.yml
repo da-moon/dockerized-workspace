@@ -1,0 +1,13 @@
+apiVersion: vendir.k14s.io/v1alpha1
+kind: Config
+directories:
+- path: "/workspace"
+  contents:
+  - path: dockerized-workspace
+    git:
+      url: git@github.com:da-moon/tfcctl-rs.git
+      ref: origin/wip
+  - path: openldap-sandbox
+    git:
+      url: git@git.sr.ht:~havi/openldap-sandbox
+      ref: origin/master

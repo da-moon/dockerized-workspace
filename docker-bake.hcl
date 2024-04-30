@@ -18,34 +18,38 @@
 # │                     cleanup builder                      │
 # ╰──────────────────────────────────────────────────────────╯
 # docker buildx use default && docker buildx ls | awk '$2 ~ /^docker(-container)*$/{print $1}' | xargs -r -I {} docker buildx rm {}
-variable "LOCAL" {default=false}
-variable "REGISTRY_HOSTNAME" {default="docker.io"}
-variable "REGISTRY_USERNAME" {default="fjolsvin"}
+variable "LOCAL" { default = false }
+variable "REGISTRY_HOSTNAME" { default = "docker.io" }
+variable "REGISTRY_USERNAME" { default = "fjolsvin" }
 group "default" {
   targets = [
-    "gitpod",
+    "default",
   ]
 }
-target "gitpod" {
+target "default" {
   context    = "."
-  dockerfile = "gitpod/Dockerfile"
-  tags       = [
-    equal(LOCAL,true)
+  dockerfile = ".gp/Dockerfile"
+  # https://wiki.archlinux.org/title/docker
+  ulimits = [
+    "nofile=1024:524288"
+  ]
+  tags = [
+    equal(LOCAL, true)
     ? "gp-archlinux-workspace"
     : "${REGISTRY_HOSTNAME}/${REGISTRY_USERNAME}/gp-archlinux-workspace:latest",
   ]
   cache-from = [
-    equal(LOCAL,true)
+    equal(LOCAL, true)
     ? ""
-    : "type=registry,mode=max,ref=${REGISTRY_HOSTNAME}/${REGISTRY_USERNAME}/gp-archlinux-workspace:cache" ,
+    : "type=registry,mode=max,ref=${REGISTRY_HOSTNAME}/${REGISTRY_USERNAME}/gp-archlinux-workspace:cache",
   ]
-  cache-to   = [
-    equal(LOCAL,true)
+  cache-to = [
+    equal(LOCAL, true)
     ? ""
-    : "type=registry,mode=max,ref=${REGISTRY_HOSTNAME}/${REGISTRY_USERNAME}/gp-archlinux-workspace:cache" ,
+    : "type=registry,mode=max,ref=${REGISTRY_HOSTNAME}/${REGISTRY_USERNAME}/gp-archlinux-workspace:cache",
   ]
-  output     = [
-    equal(LOCAL,true)
+  output = [
+    equal(LOCAL, true)
     ? "type=docker"
     : "type=registry",
   ]
