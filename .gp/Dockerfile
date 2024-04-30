@@ -413,7 +413,7 @@ RUN \
   zoxide --version > /dev/null 2>&1 && ( \
   ( \
   echo "export _ZO_DATA_DIR="${_ZO_DATA_DIR}";" ; \
-  echo '[ ! -d "${_ZO_DATA_DIR}" ] && mkdir "${_ZO_DATA_DIR}" ;' ; \
+  echo '[ ! -d "${_ZO_DATA_DIR}" ] && mkdir -p "${_ZO_DATA_DIR}" ;' ; \
   echo 'eval "$(zoxide init bash)" ;' ; \
   echo 'alias cd="z"' ; \
   ) | tee "/etc/profile.d/zoxide.sh" > /dev/null || exit 1 ; \
@@ -465,7 +465,7 @@ RUN \
   echo 'if hx --version > /dev/null 2>&1 ; then' ;\
   echo '  export EDITOR="hx" ;' ;\
   echo '  export VISUAL="hx" ;' ;\
-  echo '  [ ! -d "${HOME}/.config/helix" ] && mkdir "${HOME}/.config/helix" ;' ; \
+  echo '  [ ! -d "${HOME}/.config/helix" ] && mkdir -p "${HOME}/.config/helix" ;' ; \
   echo '  wget -qO "${HOME}/.config/helix/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/helix/config.toml" ;' ; \
   echo 'fi' ;\
   ) | tee "/etc/profile.d/editor.sh" > /dev/null || exit 1 ; \
@@ -636,7 +636,7 @@ RUN \
   "${HOME}/.local/bin" \
   "${HOME}/.config/helix" \
   && hx --version > /dev/null 2>&1 && ( \
-  [ ! -d "${HOME}/.init.d/" ] && ( mkdir "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
+  [ ! -d "${HOME}/.init.d/" ] && ( mkdir -p "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
   ( \
   echo '#!/usr/bin/env bash' ; \
   echo 'if [ ! -d "${HOME}/.config/helix/runtime/grammars/sources" ]; then' ; \
@@ -722,7 +722,7 @@ RUN \
   # https://jdimpson.livejournal.com/5685.html
   # https://stackoverflow.com/questions/8295908/how-to-use-a-variable-to-indicate-a-file-descriptor-in-bash
   tflint --version > /dev/null 2>&1 && ( \
-  [ ! -d "${HOME}/.init.d/" ] && ( mkdir "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
+  [ ! -d "${HOME}/.init.d/" ] && ( mkdir -p "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
   ( \
   echo '#!/usr/bin/env bash' ; \
   echo 'self="$(realpath -s "${BASH_SOURCE[0]}")";' ; \
@@ -949,7 +949,7 @@ USER "${USER}"
 WORKDIR "${WORKDIR}"
 RUN \
   ( \
-  echo '[ -r "/entrypoint" ] && exec /entrypoint sudo -i -u "${USER}"' ; \
+  echo '[ -r "/entrypoint" ] && exec /entrypoint sudo -E -u "${USER}"' ; \
   ) | tee "${HOME}/.bashrc" > /dev/null ; \
   # ─── SSH SETUP ──────────────────────────────────────────────────────────────────
   mkdir -p "${HOME}/.ssh" \
