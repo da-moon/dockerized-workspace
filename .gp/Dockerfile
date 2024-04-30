@@ -949,7 +949,7 @@ USER "${USER}"
 WORKDIR "${WORKDIR}"
 RUN \
   ( \
-  echo '[ -r "/entrypoint" ] && exec /entrypoint sudo -E -u "${USER}"' ; \
+  echo '[ -r "/entrypoint" ] && exec /entrypoint sudo -E -u "${USER}" bash --login' ; \
   ) | tee "${HOME}/.bashrc" > /dev/null ; \
   # ─── SSH SETUP ──────────────────────────────────────────────────────────────────
   mkdir -p "${HOME}/.ssh" \
@@ -999,6 +999,7 @@ RUN \
 RUN \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
+  cp "/etc/environment" "/etc/environment.bak" ; \ 
   ln -sf "/usr/share/zoneinfo/America/New_York" "/etc/localtime" ; \
   chown "$(id -u "${USER}"):$(id -g "${USER}")" -R  "${WORKDIR}" "${HOME}" ; \
   [ "$(pacman -Qdtq)" != "" ] && pacman -Rs $(pacman -Qdtq) ; \
