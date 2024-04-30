@@ -961,6 +961,13 @@ RUN \
   echo "  MACs hmac-sha2-512" ; \
   echo "  UserKnownHostsFile=/dev/null" ; \
   echo "  IdentityFile=~/.ssh/id_rsa_sourcehut" ; \
+  echo "Host github.com" ; \
+  echo "  StrictHostKeyChecking no" ; \
+  echo "  MACs hmac-sha2-512" ; \
+  echo "  UserKnownHostsFile=/dev/null" ; \
+  echo "  IdentitiesOnly yes" ; \
+  echo "  BatchMode yes" ; \
+  echo "  IdentityFile=~/.ssh/id_rsa_github" ; \
   echo "Host mpr" ; \
   echo "  HostName mpr.hunterwittenborn.com" ; \
   echo "  IdentityFile ~/.ssh/id_rsa_makedeb" ; \
