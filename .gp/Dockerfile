@@ -259,7 +259,7 @@ RUN \
   git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
   && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
   for i in {1..5}; do makepkg -sicr --noconfirm && break || sleep 15; done ; \
-  rm -r "/tmp/"$(basename "${url%.git}")"" \
+  rm -rf "/tmp/"$(basename "${url%.git}")"" \
   && popd > /dev/null 2>&1 || exit 1 ; \
   done ;
 #  ╭──────────────────────────────────────────────────────────╮
@@ -438,7 +438,7 @@ RUN \
   ) || exit 0 ; \
   ) || exit 1 ; \
   atuin --version > /dev/null 2>&1 && ( \
-  echo '[ ! -d "${HOME}/.config/atuin" ] && mkdir "${HOME}/.config/atuin" ;' ; \
+  echo '[ ! -d "${HOME}/.config/atuin" ] && mkdir -p "${HOME}/.config/atuin" ;' ; \
   echo 'wget -qO "${HOME}/.config/atuin/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/atuin/config.toml" ;' ; \
   echo 'sed -i -e "/db_path/d" "${HOME}/.config/atuin/config.toml" ;' ; \
   echo "echo 'db_path = \"${WORKDIR}/.history.db\"' >> '${HOME}/.config/atuin/config.toml' ;" ; \
@@ -511,8 +511,8 @@ RUN \
   echo '  flock -s 4 ;' ; \
   echo '  flock -u 4 ;' ; \
   echo '} 4<"/tmp/rust-stable.lock"' ; \
-  echo '[ -r "/tmp/rust-nightly.lock" ] && rm "/tmp/rust-nightly.lock" ;' ; \
-  echo '[ -r "/tmp/rust-stable.lock" ] && rm "/tmp/rust-stable.lock" ;' ; \
+  echo '[ -r "/tmp/rust-nightly.lock" ] && rm -f "/tmp/rust-nightly.lock" ;' ; \
+  echo '[ -r "/tmp/rust-stable.lock" ] && rm -f "/tmp/rust-stable.lock" ;' ; \
   echo 'export RUSTUP_HOME="${HOME}/.rustup";' ; \
   echo 'export CARGO_HOME="${HOME}/.cargo";' ; \
   echo 'export PATH="${PATH}:${CARGO_HOME}/bin";' ; \
@@ -627,11 +627,11 @@ RUN \
   chmod +x "${dir}/hx" ; \
   [ ! -d "${HOME}/.local/bin" ] && mkdir -p "${HOME}/.local/bin" ; \
   mv -f "${dir}/hx" "${HOME}/.local/bin/hx" ; \
-  [ -d "${HOME}/.config/helix/runtime" ] && rm -r "${HOME}/.config/helix/runtime" ; \
+  [ -d "${HOME}/.config/helix/runtime" ] && rm -rf "${HOME}/.config/helix/runtime" ; \
   mkdir -p "${HOME}/.config/helix" \
   && mv "${dir}/runtime" "${HOME}/.config/helix/runtime" \
   && ln -sf "${HOME}/.local/bin/hx" "/usr/local/bin/hx" \
-  && rm -r "${dir}" \
+  && rm -rf "${dir}" \
   && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" \
   "${HOME}/.local/bin" \
   "${HOME}/.config/helix" \
@@ -652,9 +652,9 @@ RUN \
   echo '    flock -s 20 ;' ; \
   echo '    echo "[ $(basename -s.sh "${self}") ] : cleaning up self..." ;' ; \
   echo '    flock -u 20 ;' ; \
-  echo '    rm "${self}" ;' ; \
+  echo '    rm -f "${self}" ;' ; \
   echo '  } 20<"${lockfile}"' ; \
-  echo '  [ -r "${lockfile}" ] && rm "${lockfile}" ;' ; \
+  echo '  [ -r "${lockfile}" ] && rm -f "${lockfile}" ;' ; \
   echo 'fi' ; \
   ) | tee "${HOME}/.init.d/helix.sh" > /dev/null \
   && chmod +x "${HOME}/.init.d/helix.sh" \
@@ -709,7 +709,7 @@ RUN \
   && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
   for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noprogressbar --nocheck --skipinteg --noconfirm && break || sleep 15; done \
   && popd > /dev/null 2>&1 || exit 1 ; \
-  rm -r "/tmp/"$(basename "${url%.git}")"" ; \
+  rm -rf "/tmp/"$(basename "${url%.git}")"" ; \
   go clean -modcache > /dev/null 2>&1 ; \
   su-exec "${USER}" go clean -modcache > /dev/null 2>&1 ; \
   go clean -cache > /dev/null 2>&1 ; \
@@ -762,10 +762,10 @@ RUN \
   echo '      chmod +x "${HOME}/.tflint.d/plugins/${plugin}" ;' ; \
   echo '      flock -u "${fd}" ;' ; \
   echo '    } <&${fd}' ; \
-  echo '    [ -r "${lockfile}" ] && rm "${lockfile}" ;' ; \
+  echo '    [ -r "${lockfile}" ] && rm -f "${lockfile}" ;' ; \
   echo '  fi' ; \
   echo 'done ;' ; \
-  echo '# rm "${self}" ;' ; \
+  echo 'rm -f "${self}" ;' ; \
   ) | tee "${HOME}/.init.d/tflint.sh" > /dev/null \
   && chmod +x "${HOME}/.init.d/tflint.sh" \
   && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/tflint.sh"  ; \
@@ -804,7 +804,7 @@ RUN \
   && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
   for i in {1..5}; do su-exec "${USER}" makepkg -sicr --nocheck --skipinteg --noconfirm --noprogressbar && break || sleep 15; done \
   && popd > /dev/null 2>&1 || exit 1 ; \
-  rm -r "/tmp/"$(basename "${url%.git}")"" ; \
+  rm -rf "/tmp/"$(basename "${url%.git}")"" ; \
   go clean -modcache ; \
   su-exec "${USER}" go clean -modcache ; \
   go clean -cache ; \
