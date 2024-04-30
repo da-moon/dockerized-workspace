@@ -7,7 +7,6 @@ tasks:
   - name: update-packages
     openMode: tab-before
     command: |
-      set -euo pipefail ;
       if [ -x "$(command -v topgrade)" ]; then
         topgrade \
         --disable "vscode" \
@@ -16,50 +15,43 @@ tasks:
         --yes --skip-notify --no-retry --cleanup ;
       else
         if paru --version > /dev/null 2>&1 ; then
-          paru -Syyu --removemake --cleanafter --noconfirm ;
-          [ -d "${HOME}/.cache/paru/clone/" ] ;
-          /bin/rm -rf "${HOME}/.cache/paru/clone" ;
-          mkdir -p "${HOME}/.cache/paru/clone/" ;
-          exit 0 ;
+          paru -Syyu --removemake --cleanafter --noconfirm \
+          && sudo /bin/rm -rf "${HOME}/.cache/paru/clone" \
+          && exit 0 ;
         fi
-        sudo pacman -Syyu --noconfirm ;
-        if aura --version > /dev/null 2>&1 ; then
-          sudo aura -Ayyuxac --noconfirm --skipinteg --skippgpcheck ;
-        fi
+        sudo pacman -Syyu --noconfirm && (
+          aura --version > /dev/null 2>&1 && sudo aura -Ayyuxac --noconfirm --skipinteg --skippgpcheck ;
+        ) ;
       fi
       exit 0 ;
   - name: setup-pre-commit
     command: |
-      set -euo pipefail ;
       ! pre-commit --version > /dev/null 2>&1 \
       && python3 -m pip install pre-commit --version > /dev/null 2>&1 \
-      && {
-        pre-commit install ;
-        pre-commit install --install-hooks ;
-        pre-commit install --hook-type commit-msg ;
-        pre-commit install-hooks ;
-        pre-commit autoupdate ;
-        git add .pre-commit-config.yaml ;
-      }
+      && (
+        pre-commit install \
+        && pre-commit install --install-hooks \
+        && pre-commit install --hook-type commit-msg \
+        && pre-commit install-hooks \
+        && pre-commit autoupdate \
+        && git add .pre-commit-config.yaml ;
+      )
       exit 0 ;
   - name: setup-docker-buildx
     openMode: tab-before
+    # NOTE: Gitpod buildx cache persists workspace reboots which can cause
+    # the workspace to run out of space
     command: |
-      set -euo pipefail ;
-      echo "${DOCKER_PASSWORD}" \
-      | docker login --username "${DOCKER_USERNAME}" --password-stdin
-      # NOTE: Gitpod buildx cache persists workspace reboots which can cause
-      # the workspace to run out of space
-      docker buildx prune --builder default --all --force ;
-      docker buildx create \
+      docker buildx prune --builder default --all --force \
+      && docker buildx create \
         --use \
         --name "$(basename -s ".git" "$(git remote get-url origin)")" \
-        --driver docker-container ;
-      exit 0 ;
+        --driver docker-container \
+      && echo "${DOCKER_PASSWORD}" \
+      | docker login --username "${DOCKER_USERNAME}" --password-stdin;
   - name: setup-sourcehut-ssh-key
     openMode: tab-before
     command: |
-      set -euo pipefail ;
       [ ! -d "${HOME}/.ssh" ] && mkdir "${HOME}/.ssh" ;
       if [ -n "${SOURCEHUT_PRIVATE_KEY+x}" ] \
         && [ -n "${SOURCEHUT_PRIVATE_KEY}" ]; then
@@ -86,7 +78,6 @@ tasks:
   - name: setup-makedeb-ssh-key
     openMode: tab-before
     command: |
-      set -euo pipefail ;
       [ ! -d "${HOME}/.ssh" ] && mkdir "${HOME}/.ssh" ;
       if [ -n "${MAKEDEB_PRIVATE_KEY+x}" ] \
         && [ -n "${MAKEDEB_PRIVATE_KEY}" ]; then
@@ -110,10 +101,35 @@ tasks:
         -name 'id*.pub' \
         -exec chmod 644 {} \;
       exit 0 ;
+  - name: setup-github-ssh-key
+    openMode: tab-before
+    command: |
+      [ ! -d "${HOME}/.ssh" ] && mkdir "${HOME}/.ssh" ;
+      if [ -n "${GITHUB_PRIVATE_KEY+x}" ] \
+        && [ -n "${GITHUB_PRIVATE_KEY}" ]; then
+      echo "${GITHUB_PRIVATE_KEY}" \
+        | base64 -d \
+        | tee ~/.ssh/id_rsa_github > /dev/null
+      fi
+      chmod 700 "${HOME}/.ssh" ;
+      [ -r "${HOME}/.ssh/authorized_keys" ] \
+      && chmod 644 "${HOME}/.ssh/authorized_keys" ;
+      [ -r "${HOME}/.ssh/known_hosts" ] \
+      && chmod 644 "${HOME}/.ssh/known_hosts" ;
+      [ -r "${HOME}/.ssh/config" ] \
+      && chmod 644 "${HOME}/.ssh/config" ;
+      find "${HOME}/.ssh" \
+        -type f \
+        -name 'id*' \
+        -exec chmod 600 {} \;
+      find "${HOME}/.ssh" \
+        -type f \
+        -name 'id*.pub' \
+        -exec chmod 644 {} \;
+      exit 0 ;
   - name: fix-ssh-directory-permissions
     openMode: tab-before
     command: |
-      set -euo pipefail ;
       chmod 700 "${HOME}/.ssh" ;
       [ -r "${HOME}/.ssh/authorized_keys" ] \
         && chmod 644 "${HOME}/.ssh/authorized_keys" ;
@@ -130,6 +146,13 @@ tasks:
         -name 'id*.pub' \
         -exec chmod 644 {} \;
       exit 0 ;
+  - name: git-config
+    openMode: tab-before
+    command: |
+      ( [ -n "${GITHUB_EMAIL+x}" ] && [ -n "${GITHUB_EMAIL}" ] && git config --global user.email "${GITHUB_EMAIL}" || true ) \
+      && git config --global gpg.format "ssh" \
+      && git config --global commit.gpgsign true \
+      && git config --global user.signingKey "${HOME}/.ssh/id_rsa_github"
 ports:
   - name: syncthing
     port: 8384
