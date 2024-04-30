@@ -271,7 +271,6 @@ RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   pacman --quiet -S --noconfirm --needed "docker" "docker-compose" "docker-buildx" > /dev/null 2>&1 ; \
-
   # ─── DOCKER FROM DOCKER ─────────────────────────────────────────────────────────
   ( \
   echo '#!/bin/sh' ; \
@@ -862,6 +861,7 @@ RUN \
   "xh" \
   "xcp" \
   "neovim" \
+  "nano" \
   "sd" \
   "duf" \
   "ncdu" \
