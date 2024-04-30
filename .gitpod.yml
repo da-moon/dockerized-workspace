@@ -28,40 +28,6 @@ tasks:
         fi
       fi
       exit 0 ;
-  - name: ensure-just-is-installed
-    openMode: tab-before
-    command: |
-      set -euo pipefail ;
-      if ! just --version > /dev/null 2>&1 ; then
-        curl \
-        --proto '=https' \
-        --tlsv1.2 -sSf "https://just.systems/install.sh" \
-        | sudo bash -s -- --to /usr/local/bin
-      fi
-      exit 0 ;
-  - name: ensure-go-task-is-installed
-    openMode: tab-before
-    command: |
-      set -euo pipefail ;
-      if ! task --version > /dev/null 2>&1 ; then
-        if [ "$(which "go-task" 2>/dev/null)" != "" ]; then
-          sudo ln -sf "$(which "go-task" 2>/dev/null)" "/usr/local/bin/task";
-          exit 0 ;
-        fi
-        dir="$(mktemp -d)" \
-        && pushd "$dir" > /dev/null 2>&1 \
-        && git clone --bare "https://aur.archlinux.org/go-task-bin.git" .git \
-        && git fetch --all \
-        && git config --local --bool core.bare false \
-        && git reset --hard \
-        && makepkg -sicr --noconfirm --needed \
-        && popd > /dev/null 2>&1 \
-        && rm -rf "$dir"
-      fi
-      if [ "$(which "go-task" 2>/dev/null)" != "" ]; then
-        sudo ln -sf "$(which "go-task" 2>/dev/null)" "/usr/local/bin/task"
-      fi
-      exit 0 ;
   - name: setup-pre-commit
     command: |
       set -euo pipefail ;
