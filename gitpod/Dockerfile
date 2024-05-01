@@ -15,6 +15,7 @@ ENV UID="33333"
 ENV HOME="/home/${USER}"
 ARG WORKDIR="/workspace"
 ENV WORKDIR "${WORKDIR}"
+VOLUME [ "${WORKDIR}" ]
 
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                      initial setup                       │
@@ -74,12 +75,7 @@ RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   pacman --quiet --noprogressbar -Syy --noconfirm --needed "reflector" \
-  && reflector \
-  --verbose \
-  -p https \
-  --latest 5 \
-  --sort rate \
-  --save "/etc/pacman.d/mirrorlist" > /dev/null 2>&1 \
+  && reflector --protocol https --threads 16 --country US --sort delay --latest 4 --save "/etc/pacman.d/mirrorlist" > /dev/null 2>&1 \
   && pacman --quiet --noprogressbar -Syyu --noconfirm  ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                   user and group setup                   │
@@ -88,7 +84,7 @@ RUN \
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet --noprogressbar -S --noconfirm --needed "sudo" "openssl" \
+  pacman --quiet --noprogressbar -Syy --noconfirm --needed "sudo" "openssl" \
   && ! getent group "${USER}" > /dev/null \
   && groupadd --gid "${UID}" "${USER}" > /dev/null > /dev/null \
   && useradd \
@@ -144,10 +140,35 @@ RUN \
   echo 'printf "%s\n" "${SKIP_PKGS[@]}" | tee "/tmp/.processed-pkgs" > /dev/null ;' ; \
   ) | tee "/usr/local/bin/compress-packages" > /dev/null \
   && chmod +x "/usr/local/bin/compress-packages" ;
+# ──────────────────────────────────────────────────────────
+ENV GEM_PATH="${WORKDIR}/.gem"
+
+ENV npm_config_prefix="${WORKDIR}/.npm"
+ENV PATH="${PATH}:${npm_config_prefix}/bin"
+
+ENV GO_PATH="${WORKDIR}/.go"
+ENV GO111MODULE="on"
+ENV CGO_ENABLED="0"
+ENV CGO_LDFLAGS="-s -w -extldflags '-static'"
+ENV PATH="${PATH}:${GO_PATH}/bin"
+
+ENV RUSTUP_HOME="${WORKDIR}/.rustup"
+ENV CARGO_HOME="${WORKDIR}/.cargo"
+ENV PATH="${PATH}:${CARGO_HOME}/bin"
+
+ENV PATH="${PATH}:${HOME}/.local/bin"
+ENV PATH="${PATH}:${HOME}/.luarocks/bin"
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet --noprogressbar -S --noconfirm --needed \
+  pacman --quiet --noprogressbar -Syy --noconfirm --needed \
+  "chaotic-aur/powershell-bin" \
+  "go" \
+  "ruby" \
+  "rustup" "cargo-binstall" \
+  "lua" "luajit" "luarocks" \
+  "python" "python-pip" "python-poetry" "python-setuptools" \
+  "nodejs" "npm" "yarn" \
   "base-devel" \
   "upx" \
   "git" \
@@ -159,91 +180,159 @@ RUN \
   "unzip" \
   "unrar" \
   "expac" \
-  "bash-completion" \
-  # ─── GIT CONFIG ───────────────────────────────────────────────────────────
-  && git --version > /dev/null 2>&1 && ( \
-  git config --system 'format.signoff'                                  'true' ; \
-  git config --system 'init.defaultBranch'                              'master' ; \
-  git config --system 'core.attributesfile'                             '.gitattributes' ; \
-  git config --system 'core.autocrlf'                                   'false' ; \
-  git config --system 'tag.forceSignAnnotated'                          'true' ; \
-  git config --system 'push.recursesubmodules'                          'on-demand' ; \
-  git config --system 'pull.rebase'                                     'true' ; \
-  git config --system 'rebase.autostash'                                'true' ; \
-  git config --system 'status.submodulesummary'                         'true' ; \
-  git config --system 'pager.diff'                                      '[ -x "$(command -v delta)" ] && delta || less --tab=2 -RFX' ; \
-  git config --system 'pager.grep'                                      '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
-  git config --system 'pager.blame'                                     '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
-  git config --system 'pager.log'                                       '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
-  git config --system 'pager.reflog'                                    '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
-  git config --system 'pager.show'                                      '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
-  git config --system 'diff.submodule'                                  'log' ; \
-  git config --system 'diff.tool'                                       'difftastic' ; \
-  git config --system 'diff.image.command'                              'compare $2 $1 png:- | montage -geometry +4+4 $2 - $1 png:- | display -title "$1"' ; \
-  git config --system 'diff.difftastic.command'                         'difft' ; \
-  git config --system 'diff.difftastic.binary'                          'true' ; \
-  git config --system 'difftool.prompt'                                 'false' ; \
-  git config --system 'difftool.difftastic.cmd'                         'difft --color always $LOCAL $REMOTE' ; \
-  git config --system 'difftool.delta.cmd'                              'diff -u --unified=3 --ignore-case -w $LOCAL $REMOTE | delta' ; \
-  git config --system 'gui.editor'                                      'code -w' ; \
-  git config --system 'fetch.prune'                                     'true' ; \
-  git config --system 'merge.log'                                       'true' ; \
-  git config --system 'merge.tool'                                      'code' ; \
-  git config --system 'mergetool.code.cmd'                              'code --wait --merge $REMOTE $LOCAL $BASE $MERGED' ; \
-  git config --system 'alias.view-contributors'                         'shortlog -e -s -n' ; \
-  git config --system 'alias.upstream'                                  'remote get-url origin' ; \
-  git config --system 'alias.root'                                      'rev-parse --show-toplevel' ; \
-  git config --system 'alias.scope'                                     'rev-parse --show-prefix' ; \
-  git config --system 'alias.url'                                       'ls-remote --get-url' ; \
-  git config --system 'alias.aliases'                                   'config --get-regexp alias' ; \
-  git config --system 'alias.spush'                                     'push --recurse-submodules=on-demand' ; \
-  git config --system 'alias.sfetch'                                    'submodule foreach --recursive git fetch' ; \
-  git config --system 'alias.supdate'                                   'submodule update --remote --merge' ; \
-  git config --system 'alias.default-branch'                            'rev-parse --abbrev-ref HEAD' ; \
-  git config --system 'alias.current-branch'                            '!git for-each-ref --format="%(upstream:short)" $(git symbolic-ref -q HEAD)' ; \
-  git config --system 'alias.branch-prune'                              '!git fetch -p && for b in $(git for-each-ref --format="%(if:equals=[gone])%(upstream:track)%(then)%(refname:short)%(end)" refs/heads); do git branch -d $b; done' ; \
-  git config --system 'alias.ca'                                        'commit --signoff --gpg-sign --amend --reuse-message=HEAD' ; \
-  git config --system 'alias.c'                                         'commit --signoff --gpg-sign' ; \
-  git config --system 'alias.cF'                                        '!git commit --signoff --gpg-sign --file=$(git rev-parse --show-toplevel)/.git/COMMIT_EDITMSG' ; \
-  git config --system 'alias.codegpt'                                   '! codegpt commit --preview' ; \
-  git config --system 'alias.commit-edit-message'                       '! $EDITOR $(git rev-parse --show-toplevel)/.git/COMMIT_EDITMSG' ; \
-  git config --system 'alias.commit-summary'                            'log --color --graph --pretty=format:"%C(red)%h%C(reset) %s %C(bold blue)[%an](mailto:%ae)%C(reset) %C(green)%C(bold)%cr" --abbrev-commit' ; \
-  git config --system 'alias.head-hash'                                 'rev-parse HEAD' ; \
-  git config --system 'alias.latest-commit'                             'log -1 HEAD --stat' ; \
-  git config --system 'alias.untracked'                                 'ls-files --others --exclude-standard' ; \
-  git config --system 'alias.tracked'                                   '!git ls-tree -r $(git symbolic-ref --quiet --short HEAD || git rev-parse HEAD) --name-only' ; \
-  git config --system 'alias.tags'                                      'for-each-ref --format="%(refname:short) (%(committerdate:relative))" --sort=committerdate refs/tags' ; \
-  git config --system 'alias.latest-tag'                                '!git describe --tags $(git rev-list --tags --max-count=1 2>/dev/null) 2>/dev/null' ; \
-  git config --system 'alias.release-notes'                             'log --color --pretty=format:"* %C(red)%h%C(reset) %s %C(bold blue)[%an](mailto:%ae)%C(reset)" --abbrev-commit --dense --no-merges' ; \
-  git config --system 'alias.staged'                                    'diff --name-only --staged' ; \
-  git config --system 'alias.re-stage'                                  'git add $(git diff --name-only --staged)' ; \
-  git config --system 'alias.difft'                                     'difftool --tool difftastic' ; \
-  git config --system 'alias.diffd'                                     'difftool --tool delta' ; \
-  git config --system 'alias.not-staged'                                'diff-files --name-only -B -R -M' ; \
-  git config --system 'alias.all-changes'                               'diff --name-only HEAD' ; \
-  git config --system 'alias.ui'                                        '!f() { cd "$(git rev-parse --show-toplevel)" && gitui; }; f' ; \
-  git config --system 'alias.zipball'                                   '!git archive --format=zip --output=$(basename -s.git $(git remote get-url origin))-$(git describe --abbrev=0).zip $(git describe --abbrev=0)' ; \
-  git config --system 'alias.tarball'                                   '!git archive --format=tar.gz --output=$(basename -s.git $(git remote get-url origin))-$(git describe --abbrev=0).tar.gz $(git describe --abbrev=0)' ; \
-  git config --system 'alias.conflicts'                                 '! $EDITOR $(git diff --name-only --diff-filter=U)' ; \
-  git config --system 'alias.issues'                                    '! gh issue list --assignee "@me"' ; \
-  git config --system 'alias.changes'                                   'diff-index --name-only -B -R -M -C HEAD' ; \
-  git config --system 'alias.rel-changes'                               'ls-files -m -o --exclude-standard' ; \
-  git config --system 'alias.ignored'                                   'ls-files --others --ignored --exclude-standard' ; \
-  git config --system 'alias.modified-files'                            'diff --name-only' ; \
-  git config --system 'alias.restage'                                   '!git add $(git diff --name-only)' ; \
-  git config --system 'alias.stage-all'                                 '!git add $(git diff --name-only HEAD)' ; \
-  git config --system "alias.next-patch-release"                        '!git describe --tags $(git rev-list --tags --max-count=1 2>/dev/null) 2>/dev/null'"| awk -F. '{gsub(\"v\",\"\",\$1);printf \"%s.%s.%s\", \$1,\$2,\$3+1}END {if (NR==0){print \"0.0.1\"}}'" ; \
-  git config --system "alias.next-minor-release"                        '!git describe --tags $(git rev-list --tags --max-count=1 2>/dev/null) 2>/dev/null'"| awk -F. '{gsub(\"v\",\"\",\$1);printf \"%s.%s.0\", \$1,\$2+1}END {if (NR==0){print \"0.0.1\"}}'" ; \
-  git config --system "alias.next-major-release"                        '!git describe --tags $(git rev-list --tags --max-count=1 2>/dev/null) 2>/dev/null'"| awk -F. '{gsub(\"v\",\"\",\$1);printf \"%s.0.0\", \$1+1}END {if (NR==0){print \"0.0.1\"}}'" ; \
-  git config --system 'alias.fa'                                        '!f() { cd "$(git rev-parse --show-toplevel)" && git ls-files -m -o --exclude-standard | fzf -0 --print0 --multi --reverse --height=40% --tabstop=2 --prompt=" │ " --color="prompt:0,hl:178,hl+:178" --preview-window="right:60%" --height="80%" --bind="tab:ignore" --bind="shift-tab:ignore" --bind="ctrl-t:ignore" --bind="ctrl-g:ignore" --bind="right:toggle+down" --bind="left:toggle+up" --bind="ctrl-space:select-all" --bind="alt-space:deselect-all" --preview="git difftool --tool=delta  {}" | xargs -0 -t -o -I {} git add "{}";  }; f' ; \
-  git config --system "alias.spark"                                     '!git log --date=short --pretty=format:%ad | sort | uniq -c | awk "{print $1}" | spark' ; \
-  git config --system "alias.commit-count"                              '!git log --date=short --pretty=format:%ad | sort | uniq -c' ; \
-  git config --system "alias.commit-count-ordered"                      '!git log --date=short --pretty=format:%ad | sort | uniq -c | sort -r | head' ; \
+  "bash-completion" ; \
+  #  ╭──────────────────────────────────────────────────────────╮
+  #  │                 powershell init                          │
+  #  ╰──────────────────────────────────────────────────────────╯
+  pwsh --version > /dev/null 2>&1 && ( \
+    pwsh -c '$parent=Split-Path -parent $PROFILE ; if (-not(Test-Path -Path $parent -PathType Container)) {$null = New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop}' ; \
   ) || exit 1 ; \
+  #  ╭──────────────────────────────────────────────────────────╮
+  #  │                     go setup                             │
+  #  ╰──────────────────────────────────────────────────────────╯
+  go version > /dev/null 2>&1 && ( \
+    echo "export GOPATH=\"${GO_PATH}\";" ; \
+    echo "export GO111MODULE=\"${GO111MODULE}\";" ; \
+    echo "export CGO_ENABLED=\"${CGO_ENABLED}\";" ; \
+    echo 'export PATH="${PATH}:$(go env GOPATH)/bin";' ; \
+  ) | tee "/etc/profile.d/go.sh" > /dev/null || exit 1 ; \
+  #  ╭──────────────────────────────────────────────────────────╮
+  #  │                     ruby setup                           │
+  #  ╰──────────────────────────────────────────────────────────╯
+  gem --version > /dev/null 2>&1 && ( \
+    echo "export GEM_PATH=\"${GEM_PATH}\";" ; \
+    echo 'export GEM_HOME="$(ruby -e "puts Gem.user_dir")";' ; \
+    echo 'export PATH="${PATH}:${GEM_HOME}/bin";' ; \
+  ) | tee "/etc/profile.d/ruby.sh" > /dev/null || exit 1 ; \
+  #  ╭──────────────────────────────────────────────────────────╮
+  #  │                 nodejs setup                             │
+  #  ╰──────────────────────────────────────────────────────────╯
+  npm version > /dev/null 2>&1 && ( \
+    echo "export npm_config_prefix=\"${npm_config_prefix}\";" ; \
+    echo 'export PATH="${PATH}:$(npm config get prefix)/bin";' ; \
+  ) | tee "/etc/profile.d/npm.sh" > /dev/null || exit 1 ; \
+  yarn --version > /dev/null 2>&1 && ( \
+    echo 'export PATH="${PATH}:$(yarn global bin)";' ; \
+  ) | tee "/etc/profile.d/yarn.sh" > /dev/null || exit 1 ; \
+  # ─── GIT CONFIG ───────────────────────────────────────────────────────────
+  git --version > /dev/null 2>&1 && ( \
+    git config --system 'format.signoff'                                  'true' ; \
+    git config --system 'init.defaultBranch'                              'master' ; \
+    git config --system 'core.attributesfile'                             '.gitattributes' ; \
+    git config --system 'core.autocrlf'                                   'false' ; \
+    git config --system 'tag.forceSignAnnotated'                          'true' ; \
+    git config --system 'push.recursesubmodules'                          'on-demand' ; \
+    git config --system 'pull.rebase'                                     'true' ; \
+    git config --system 'rebase.autostash'                                'true' ; \
+    git config --system 'status.submodulesummary'                         'true' ; \
+    git config --system 'pager.diff'                                      '[ -x "$(command -v delta)" ] && delta || less --tab=2 -RFX' ; \
+    git config --system 'pager.grep'                                      '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
+    git config --system 'pager.blame'                                     '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
+    git config --system 'pager.log'                                       '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
+    git config --system 'pager.reflog'                                    '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
+    git config --system 'pager.show'                                      '[ -x "$(command -v delta)" ] && delta || less -RFX' ; \
+    git config --system 'diff.submodule'                                  'log' ; \
+    git config --system 'diff.tool'                                       'difftastic' ; \
+    git config --system 'diff.image.command'                              'compare $2 $1 png:- | montage -geometry +4+4 $2 - $1 png:- | display -title "$1"' ; \
+    git config --system 'diff.difftastic.command'                         'difft' ; \
+    git config --system 'diff.difftastic.binary'                          'true' ; \
+    git config --system 'difftool.prompt'                                 'false' ; \
+    git config --system 'difftool.difftastic.cmd'                         'difft --color always $LOCAL $REMOTE' ; \
+    git config --system 'difftool.delta.cmd'                              'diff -u --unified=3 --ignore-case -w $LOCAL $REMOTE | delta' ; \
+    git config --system 'gui.editor'                                      'code -w' ; \
+    git config --system 'fetch.prune'                                     'true' ; \
+    git config --system 'merge.log'                                       'true' ; \
+    git config --system 'merge.tool'                                      'code' ; \
+    git config --system 'mergetool.code.cmd'                              'code --wait --merge $REMOTE $LOCAL $BASE $MERGED' ; \
+    git config --system 'alias.view-contributors'                         'shortlog -e -s -n' ; \
+    git config --system 'alias.upstream'                                  'remote get-url origin' ; \
+    git config --system 'alias.root'                                      'rev-parse --show-toplevel' ; \
+    git config --system 'alias.scope'                                     'rev-parse --show-prefix' ; \
+    git config --system 'alias.url'                                       'ls-remote --get-url' ; \
+    git config --system 'alias.aliases'                                   'config --get-regexp alias' ; \
+    git config --system 'alias.spush'                                     'push --recurse-submodules=on-demand' ; \
+    git config --system 'alias.sfetch'                                    'submodule foreach --recursive git fetch' ; \
+    git config --system 'alias.supdate'                                   'submodule update --remote --merge' ; \
+    git config --system 'alias.default-branch'                            'rev-parse --abbrev-ref HEAD' ; \
+    git config --system 'alias.current-branch'                            '!git for-each-ref --format="%(upstream:short)" $(git symbolic-ref -q HEAD)' ; \
+    git config --system 'alias.branch-prune'                              '!git fetch -p && for b in $(git for-each-ref --format="%(if:equals=[gone])%(upstream:track)%(then)%(refname:short)%(end)" refs/heads); do git branch -d $b; done' ; \
+    git config --system 'alias.ca'                                        'commit --signoff --gpg-sign --amend --reuse-message=HEAD' ; \
+    git config --system 'alias.c'                                         'commit --signoff --gpg-sign' ; \
+    git config --system 'alias.cF'                                        '!git commit --signoff --gpg-sign --file=$(git rev-parse --show-toplevel)/.git/COMMIT_EDITMSG' ; \
+    git config --system 'alias.codegpt'                                   '! codegpt commit --preview' ; \
+    git config --system 'alias.commit-edit-message'                       '! $EDITOR $(git rev-parse --show-toplevel)/.git/COMMIT_EDITMSG' ; \
+    git config --system 'alias.commit-summary'                            'log --color --graph --pretty=format:"%C(red)%h%C(reset) %s %C(bold blue)[%an](mailto:%ae)%C(reset) %C(green)%C(bold)%cr" --abbrev-commit' ; \
+    git config --system 'alias.head-hash'                                 'rev-parse HEAD' ; \
+    git config --system 'alias.latest-commit'                             'log -1 HEAD --stat' ; \
+    git config --system 'alias.untracked'                                 'ls-files --others --exclude-standard' ; \
+    git config --system 'alias.tracked'                                   '!git ls-tree -r $(git symbolic-ref --quiet --short HEAD || git rev-parse HEAD) --name-only' ; \
+    git config --system 'alias.tags'                                      'for-each-ref --format="%(refname:short) (%(committerdate:relative))" --sort=committerdate refs/tags' ; \
+    git config --system 'alias.latest-tag'                                '!git describe --tags $(git rev-list --tags --max-count=1 2>/dev/null) 2>/dev/null' ; \
+    git config --system 'alias.release-notes'                             'log --color --pretty=format:"* %C(red)%h%C(reset) %s %C(bold blue)[%an](mailto:%ae)%C(reset)" --abbrev-commit --dense --no-merges' ; \
+    git config --system 'alias.staged'                                    'diff --name-only --staged' ; \
+    git config --system 'alias.re-stage'                                  'git add $(git diff --name-only --staged)' ; \
+    git config --system 'alias.difft'                                     'difftool --tool difftastic' ; \
+    git config --system 'alias.diffd'                                     'difftool --tool delta' ; \
+    git config --system 'alias.not-staged'                                'diff-files --name-only -B -R -M' ; \
+    git config --system 'alias.all-changes'                               'diff --name-only HEAD' ; \
+    git config --system 'alias.ui'                                        '!f() { cd "$(git rev-parse --show-toplevel)" && gitui; }; f' ; \
+    git config --system 'alias.zipball'                                   '!git archive --format=zip --output=$(basename -s.git $(git remote get-url origin))-$(git describe --abbrev=0).zip $(git describe --abbrev=0)' ; \
+    git config --system 'alias.tarball'                                   '!git archive --format=tar.gz --output=$(basename -s.git $(git remote get-url origin))-$(git describe --abbrev=0).tar.gz $(git describe --abbrev=0)' ; \
+    git config --system 'alias.conflicts'                                 '! $EDITOR $(git diff --name-only --diff-filter=U)' ; \
+    git config --system 'alias.issues'                                    '! gh issue list --assignee "@me"' ; \
+    git config --system 'alias.changes'                                   'diff-index --name-only -B -R -M -C HEAD' ; \
+    git config --system 'alias.rel-changes'                               'ls-files -m -o --exclude-standard' ; \
+    git config --system 'alias.ignored'                                   'ls-files --others --ignored --exclude-standard' ; \
+    git config --system 'alias.modified-files'                            'diff --name-only' ; \
+    git config --system 'alias.restage'                                   '!git add $(git diff --name-only)' ; \
+    git config --system 'alias.stage-all'                                 '!git add $(git diff --name-only HEAD)' ; \
+    git config --system "alias.next-patch-release"                        '!git describe --tags $(git rev-list --tags --max-count=1 2>/dev/null) 2>/dev/null'"| awk -F. '{gsub(\"v\",\"\",\$1);printf \"%s.%s.%s\", \$1,\$2,\$3+1}END {if (NR==0){print \"0.0.1\"}}'" ; \
+    git config --system "alias.next-minor-release"                        '!git describe --tags $(git rev-list --tags --max-count=1 2>/dev/null) 2>/dev/null'"| awk -F. '{gsub(\"v\",\"\",\$1);printf \"%s.%s.0\", \$1,\$2+1}END {if (NR==0){print \"0.0.1\"}}'" ; \
+    git config --system "alias.next-major-release"                        '!git describe --tags $(git rev-list --tags --max-count=1 2>/dev/null) 2>/dev/null'"| awk -F. '{gsub(\"v\",\"\",\$1);printf \"%s.0.0\", \$1+1}END {if (NR==0){print \"0.0.1\"}}'" ; \
+    git config --system 'alias.fa'                                        '!f() { cd "$(git rev-parse --show-toplevel)" && git ls-files -m -o --exclude-standard | fzf -0 --print0 --multi --reverse --height=40% --tabstop=2 --prompt=" │ " --color="prompt:0,hl:178,hl+:178" --preview-window="right:60%" --height="80%" --bind="tab:ignore" --bind="shift-tab:ignore" --bind="ctrl-t:ignore" --bind="ctrl-g:ignore" --bind="right:toggle+down" --bind="left:toggle+up" --bind="ctrl-space:select-all" --bind="alt-space:deselect-all" --preview="git difftool --tool=delta  {}" | xargs -0 -t -o -I {} git add "{}";  }; f' ; \
+    git config --system "alias.spark"                                     '!git log --date=short --pretty=format:%ad | sort | uniq -c | awk "{print $1}" | spark' ; \
+    git config --system "alias.commit-count"                              '!git log --date=short --pretty=format:%ad | sort | uniq -c' ; \
+    git config --system "alias.commit-count-ordered"                      '!git log --date=short --pretty=format:%ad | sort | uniq -c | sort -r | head' ; \
+  ) || exit 1 ; \
+  #  ────────────────────────────────────────────────────────────
+  # NOTE: installing rustup toolchains after container starts up. this helps with minimizing docker image size
+  # https://stackoverflow.com/questions/28227739/lock-a-file-in-bash-using-flock-and-lockfile
+  #  ────────────────────────────────────────────────────────────
+  rustup --version > /dev/null 2>&1 && ( \
+    echo '(' ; \
+    echo '  flock -x -n 3 || exit 55 ;' ; \
+    echo '  ! ( rustup toolchain list | grep -q "nightly" ) && rustup toolchain install nightly ;' ; \
+    echo ') 3> "/tmp/rust-nightly.lock"' ; \
+    echo '(' ; \
+    echo '  flock -x -n 4 || exit 55 ;' ; \
+    echo '  ! ( rustup toolchain list | grep -q "stable" ) && (rustup toolchain install stable && rustup default stable );' ; \
+    echo ') 4> "/tmp/rust-stable.lock"' ; \
+    echo '{' ; \
+    echo '  flock -s 3 ;' ; \
+    echo '  flock -u 3 ;' ; \
+    echo '} 3<"/tmp/rust-nightly.lock" ;' ; \
+    echo '{' ; \
+    echo '  flock -s 4 ;' ; \
+    echo '  flock -u 4 ;' ; \
+    echo '} 4<"/tmp/rust-stable.lock"' ; \
+    echo '[ -r "/tmp/rust-nightly.lock" ] && rm -f "/tmp/rust-nightly.lock" ;' ; \
+    echo '[ -r "/tmp/rust-stable.lock" ] && rm -f "/tmp/rust-stable.lock" ;' ; \
+    echo "export RUSTUP_HOME=\"${RUSTUP_HOME}\";" ; \
+    echo "export CARGO_HOME=\"${CARGO_HOME}\";" ; \
+    echo 'export PATH="${PATH}:${CARGO_HOME}/bin";' ; \
+  ) | tee -a "/etc/profile.d/00-rust.sh" > /dev/null ; \
+  # For fixing the following error:
+  #
+  # ❯ sudo su -
+  # -bash: /etc/bash_completion.d/cargo: No such file or directory
+  ( \
+    [ -d "/usr/share/bash-completion/completions" ] && ( \
+      ( [ ! -r "/usr/share/bash-completion/completions/cargo" ] && rustup completions bash cargo > "/usr/share/bash-completion/completions/cargo" || exit 0 ; ) ; \
+      ( [ ! -r "/usr/share/bash-completion/completions/rustup" ] && rustup completions bash rustup > "/usr/share/bash-completion/completions/rustup" || exit 0 ; ) ; \
+    ) || exit 0 ; \
+  ) ; \
   compress-packages ;
-#  ╭──────────────────────────────────────────────────────────╮
-#  │              install core pakages from aur               │
-#  ╰──────────────────────────────────────────────────────────╯
+# ──────────────────────────────────────────────────────────
 USER "${USER}"
 # hadolint ignore=SC2034,SC2046
 RUN \
@@ -309,33 +398,28 @@ ENV COLORTERM="truecolor"
 ENV EDITOR="hx"
 ENV VISUAL="hx"
 ENV _ZO_DATA_DIR="${WORKDIR}/.zoxide/"
-ENV GEM_PATH="${WORKDIR}/.gem"
-ENV npm_config_prefix="${WORKDIR}/.npm"
-ENV PATH="${PATH}:${npm_config_prefix}/bin"
-ENV GO_PATH="${WORKDIR}/.go"
-ENV GO111MODULE="on"
-ENV CGO_ENABLED="0"
-ENV CGO_LDFLAGS="-s -w -extldflags '-static'"
-ENV PATH="${PATH}:${HOME}/.local/bin"
-ENV PATH="${PATH}:${HOME}/.luarocks/bin"
+
 # hadolint ignore=SC2016
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
+  export PIP_NO_CACHE_DIR="off" ; \
+  export MAKEFLAGS="-j$(nproc)" ; \
+  export CGO_ENABLED=1; \
+  export CGO_LDFLAGS="-g -O2" ; \
+  AUR_CLONE_URLS=( \
+  "https://aur.archlinux.org/tfenv.git" \
+  "https://aur.archlinux.org/tflint-bin.git" \
+  "https://aur.archlinux.org/terraform-docs-bin.git" \
+  ) ; \
+  GROUPS_ARR=( \
+  "tfenv" \
+  "consul" \
+  "vault" \
+  ) ; \
   pacman --quiet -S --noconfirm --needed \
-  "chaotic-aur/powershell-bin" \
-  "go" \
-  "lua" \
-  "luajit" \
-  "luarocks" \
-  "python" \
-  "python-pip" \
-  "python-poetry" \
-  "python-setuptools" \
-  "ruby" \
-  "nodejs" \
-  "npm" \
-  "yarn" \
+  "helm" "kustomize" "kube-linter" "kubectl" \
+  "consul" "vault" \
   "starship" \
   "fzf" \
   "go-yq" \
@@ -344,7 +428,6 @@ RUN \
   "difftastic" \
   "zellij" \
   "zoxide" \
-  "xplr" \
   "ripgrep" \
   "eza" \
   "atuin" \
@@ -353,219 +436,143 @@ RUN \
   "just" \
   "make" \
   "go-task" ; \
-  #  ╭──────────────────────────────────────────────────────────╮
-  #  │                     go setup                             │
-  #  ╰──────────────────────────────────────────────────────────╯
-  go version > /dev/null 2>&1 && ( \
-  echo 'export PATH="${PATH}:$(go env GOPATH)/bin";' ; \
-  ) | tee "/etc/profile.d/go.sh" > /dev/null || exit 1 ; \
-  #  ╭──────────────────────────────────────────────────────────╮
-  #  │                     ruby setup                           │
-  #  ╰──────────────────────────────────────────────────────────╯
-  gem --version > /dev/null 2>&1 && ( \
-  echo "export GEM_PATH="${GEM_PATH}";" ; \
-  echo 'export GEM_HOME="$(ruby -e "puts Gem.user_dir")";' ; \
-  echo 'export PATH="${PATH}:${GEM_HOME}/bin";' ; \
-  ) | tee "/etc/profile.d/ruby.sh" > /dev/null || exit 1 ; \
-  #  ╭──────────────────────────────────────────────────────────╮
-  #  │                     python setup                         │
-  #  ╰──────────────────────────────────────────────────────────╯
-  poetry --version > /dev/null 2>&1 && ( \
-  echo 'eval "$(poetry completions bash)" ;' ; \
-  ) | tee "/etc/profile.d/poetry.sh" > /dev/null || exit 1 ; \
-  #  ╭──────────────────────────────────────────────────────────╮
-  #  │                 nodejs setup                             │
-  #  ╰──────────────────────────────────────────────────────────╯
-  #  ╭──────────────────────────────────────────────────────────╮
-  #  │                 powershell init                          │
-  #  ╰──────────────────────────────────────────────────────────╯
-  pwsh --version > /dev/null 2>&1 && ( \
-  pwsh -c '$parent=Split-Path -parent $PROFILE ; if (-not(Test-Path -Path $parent -PathType Container)) {$null = New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop}' ; \
-  ) || exit 1 ; \
+  for url in "${AUR_CLONE_URLS[@]}";do \
+    git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
+    && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
+    && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
+    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noprogressbar --nocheck --skipinteg --noconfirm && break || sleep 15; done \
+    && popd > /dev/null 2>&1 || exit 1 ; \
+    rm -rf "/tmp/"$(basename "${url%.git}")"" ; \
+  done ; \
+  for group in "${GROUPS_ARR[@]}";do \
+    getent group "${group}" > /dev/null 2>&1 && usermod -aG "${group}" "${USER}" || continue ; \
+  done ; \
+  mkdir -p "${HOME}/.local/share/bash-completion/completions" ; \
+  starship --version > /dev/null 2>&1 && echo 'eval "$(starship init bash)" ;' | tee "/etc/profile.d/starship.sh" > /dev/null || exit 1 ; \
+  just --version > /dev/null 2>&1 && echo 'eval "$(just --completions bash)" ;' | tee "/etc/profile.d/just.sh" > /dev/null || exit 1 ; \
+  yq --version > /dev/null 2>&1 && echo 'eval "$(yq shell-completion bash)" ;' | tee "/etc/profile.d/yq.sh" > /dev/null || exit 1 ; \
+  poetry --version > /dev/null 2>&1 && echo 'eval "$(poetry completions bash)" ;' | tee "/etc/profile.d/poetry.sh" > /dev/null || exit 1 ; \
+  kubectl version --client=true > /dev/null 2>&1 && echo 'eval "$(kubectl completion bash)" ;' | tee "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ; \
+  helm version > /dev/null 2>&1 && echo 'eval "$(helm completion bash)" ;' | tee -a "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ; \
+  kustomize version > /dev/null 2>&1 && echo 'eval "$(kustomize completion bash)" ;' | tee -a "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ; \
+  kube-linter version > /dev/null 2>&1 &&  echo 'eval "$(kube-linter completion bash)" ;' | tee -a "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ; \
+  terraform-docs version > /dev/null 2>&1 && echo 'eval "$(terraform-docs completion bash)" ;' tee "/etc/profile.d/terraform-docs.sh" > /dev/null || exit 1 ; \
+  tfenv --version >/dev/null 2>&1 && ( \
+    tfenv install "latest" \
+    && tfenv use "latest" ; \
+  ) ; \
+  terraform --version > /dev/null 2>&1 && ( \
+    echo 'alias tf="terraform" ;' ; \
+    echo 'alias tfa="terraform apply -auto-approve" ;' ; \
+    echo 'alias tfd="terraform destroy -auto-approve" ;' ; \
+    echo 'alias tfi="terraform init" ;' ; \
+    echo 'alias tfo="terraform output" ;' ; \
+    echo 'alias tfp="terraform plan" ;' ; \
+    echo 'alias tfw="terraform workspace" ;' ; \
+    echo 'alias tfwl="terraform workspace list" ;' ; \
+    echo 'alias tfws="terraform workspace select" ;' ; \
+  ) | tee "/etc/profile.d/eza.sh" > /dev/null || exit 1 ; \
   # ─── USE DELTA FOR GIT DIFFS ────────────────────────────────────────────────────
   delta --version > /dev/null 2>&1 && ( \
-  git config --system pager.diff delta \
-  && git config --system pager.log delta \
-  && git config --system pager.reflog delta \
-  && git config --system pager.show delta \
-  && git config --system interactive.difffilter "delta --color-only --features=interactive" \
-  && git config --system delta.features "side-by-side line-numbers decorations" \
-  && git config --system delta.whitespace-error-style "22 reverse" \
-  && git config --system delta.decorations.commit-decoration-style "bold yellow box ul" \
-  && git config --system delta.decorations.file-style "bold yellow ul" \
-  && git config --system delta.decorations.file-decoration-style "none" \
-  && git config --system delta.decorations.commit-style "raw" \
-  && git config --system delta.decorations.hunk-header-decoration-style "blue box" \
-  && git config --system delta.decorations.hunk-header-file-style "red" \
-  && git config --system delta.decorations.hunk-header-line-number-style "#067a00" \
-  && git config --system delta.decorations.hunk-header-style "file line-number syntax" \
-  && git config --system delta.interactive.keep-plus-minus-markers "false" \
+    git config --system pager.diff delta \
+    && git config --system pager.log delta \
+    && git config --system pager.reflog delta \
+    && git config --system pager.show delta \
+    && git config --system interactive.difffilter "delta --color-only --features=interactive" \
+    && git config --system delta.features "side-by-side line-numbers decorations" \
+    && git config --system delta.whitespace-error-style "22 reverse" \
+    && git config --system delta.decorations.commit-decoration-style "bold yellow box ul" \
+    && git config --system delta.decorations.file-style "bold yellow ul" \
+    && git config --system delta.decorations.file-decoration-style "none" \
+    && git config --system delta.decorations.commit-style "raw" \
+    && git config --system delta.decorations.hunk-header-decoration-style "blue box" \
+    && git config --system delta.decorations.hunk-header-file-style "red" \
+    && git config --system delta.decorations.hunk-header-line-number-style "#067a00" \
+    && git config --system delta.decorations.hunk-header-style "file line-number syntax" \
+    && git config --system delta.interactive.keep-plus-minus-markers "false" \
   ) || exit 1 ; \
   go-task --version > /dev/null 2>&1 && ( \
-  ln -sf "$(which "go-task" 2>/dev/null)" "/usr/local/bin/task" ; \
-  ) || exit 1 ; \
-  starship --version > /dev/null 2>&1 && echo 'eval "$(starship init bash)" ;' > "/etc/profile.d/starship.sh" || exit 1 ; \
-  yq --version > /dev/null 2>&1 && echo 'eval "$(yq shell-completion bash)" ;' > "/etc/profile.d/yq.sh" || exit 1 ; \
-  just --version > /dev/null 2>&1 && ( \
-  echo 'eval "$(just --completions bash)" ;' > "/etc/profile.d/just.sh" ; \
+    [ -n "$(which "go-task" 2>/dev/null)" ] && ln -sf "$(which "go-task" 2>/dev/null)" "/usr/local/bin/task" || true ; \
+    COMPL_URL="https://raw.githubusercontent.com/go-task/task/main/completion/bash/task.bash" ; \
+    wget -qO "/etc/bash_completion.d/$(basename -s.bash "${COMPL_URL}")" "${COMPL_URL}" || echo "$(basename -s.bash "${COMPL_URL}") bash completion" >> /.failures ; \
   ) || exit 1 ; \
   zoxide --version > /dev/null 2>&1 && ( \
-  ( \
-  echo "export _ZO_DATA_DIR="${_ZO_DATA_DIR}";" ; \
-  echo '[ ! -d "${_ZO_DATA_DIR}" ] && mkdir -p "${_ZO_DATA_DIR}" ;' ; \
-  echo 'eval "$(zoxide init bash)" ;' ; \
-  echo 'alias cd="z"' ; \
-  ) | tee "/etc/profile.d/zoxide.sh" > /dev/null || exit 1 ; \
+    ( \
+      echo "export _ZO_DATA_DIR="${_ZO_DATA_DIR}";" ; \
+      echo '[ ! -d "${_ZO_DATA_DIR}" ] && mkdir -p "${_ZO_DATA_DIR}" ;' ; \
+      echo 'eval "$(zoxide init bash)" ;' ; \
+      echo 'alias cd="z"' ; \
+    ) | tee "/etc/profile.d/zoxide.sh" > /dev/null || exit 1 ; \
   ) || exit 1 ; \
   bat --version > /dev/null 2>&1 && ( \
-  echo 'alias cat="bat -pp" ;' ; \
-  echo "export MANPAGER='sh -c \"col -bx | bat --language man --style plain\"' ;" ; \
+    echo 'alias cat="bat -pp" ;' ; \
+    echo "export MANPAGER='sh -c \"col -bx | bat --language man --style plain\"' ;" ; \
   ) | tee "/etc/profile.d/bat.sh" > /dev/null || exit 1  ; \
   eza --version > /dev/null 2>&1 && ( \
-  echo 'alias la="eza -alhF" ;' ; \
-  echo 'alias ll="eza -lhF" ;' ; \
-  echo 'alias llfu="eza -bghHliS --git" ;' ; \
-  echo 'alias llt="eza -T" ;' ; \
-  echo 'alias ls="eza" ;' ; \
+    echo 'alias la="eza -alhF" ;' ; \
+    echo 'alias ll="eza -lhF" ;' ; \
+    echo 'alias llfu="eza -bghHliS --git" ;' ; \
+    echo 'alias llt="eza -T" ;' ; \
+    echo 'alias ls="eza" ;' ; \
   ) | tee "/etc/profile.d/eza.sh" > /dev/null || exit 1 ; \
   gh --version > /dev/null 2>&1 && ( \
-  echo 'eval "$(gh completion -s bash)" ;' > "/etc/profile.d/gh.sh" ; \
-  pwsh --version && ( \
-  pwsh -c ' \
-  Invoke-Expression -Command $(gh completion -s powershell | Out-String) | Out-File -Append -Encoding ascii "$PROFILE" \
-  ' ; \
-  ) || exit 0 ; \
+    echo 'eval "$(gh completion -s bash)" ;' > "/etc/profile.d/gh.sh" ; \
+    pwsh --version && ( \
+    pwsh -c ' \
+    Invoke-Expression -Command $(gh completion -s powershell | Out-String) | Out-File -Append -Encoding ascii "$PROFILE" \
+    ' ; \
+    ) || exit 0 ; \
+  ) || exit 1 ; \
+  rg --version > /dev/null 2>&1 && ( \
+    echo 'eval "$(rg --generate=complete-bash)" ;' > "/etc/profile.d/rg.sh" ; \
+    pwsh --version && ( \
+    pwsh -c ' \
+    Invoke-Expression -Command $(rg --generate=complete-powershell | Out-String) | Out-File -Append -Encoding ascii "$PROFILE" \
+    ' ; \
+    ) || exit 0 ; \
   ) || exit 1 ; \
   atuin --version > /dev/null 2>&1 && ( \
-  echo '[ ! -d "${HOME}/.config/atuin" ] && mkdir -p "${HOME}/.config/atuin" ;' ; \
-  echo 'wget -qO "${HOME}/.config/atuin/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/atuin/config.toml" ;' ; \
-  echo 'sed -i -e "/db_path/d" "${HOME}/.config/atuin/config.toml" ;' ; \
-  echo "echo 'db_path = \"${WORKDIR}/.history.db\"' >> '${HOME}/.config/atuin/config.toml' ;" ; \
-  echo '[[ -r "/usr/share/bash-preexec/bash-preexec.sh" ]] && source "/usr/share/bash-preexec/bash-preexec.sh"' ; \
-  echo 'eval "$(atuin init bash)" ;' ; \
+    echo '[ ! -d "${HOME}/.config/atuin" ] && mkdir -p "${HOME}/.config/atuin" ;' ; \
+    echo 'wget -qO "${HOME}/.config/atuin/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/atuin/config.toml" ;' ; \
+    echo 'sed -i -e "/db_path/d" "${HOME}/.config/atuin/config.toml" ;' ; \
+    echo "echo 'db_path = \"${WORKDIR}/.history.db\"' >> '${HOME}/.config/atuin/config.toml' ;" ; \
+    echo '[[ -r "/usr/share/bash-preexec/bash-preexec.sh" ]] && source "/usr/share/bash-preexec/bash-preexec.sh"' ; \
+    echo 'eval "$(atuin init bash)" ;' ; \
   ) | tee "/etc/profile.d/atuin.sh" > /dev/null || exit 1 ; \
-  xplr --version > /dev/null 2>&1 && ( \
-  echo '[ ! -d "${HOME}/.config/xplr" ] && mkdir -p "${HOME}/.config/xplr" ;' ; \
-  echo 'wget -qO "${HOME}/.config/xplr/init.lua" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/xplr/init.lua" ;' ; \
-  ) | tee "/etc/profile.d/xplr.sh" > /dev/null  || exit 1 ; \
   fzf --version > /dev/null 2>&1 && ( \
-  echo '_fzf_complete_make() {' ; \
-  echo '  FZF_COMPLETION_TRIGGER="" _fzf_complete "-1" "${@}" < <(make -pqr 2>/dev/null \' ; \
-  echo '  | awk -F":" "/^[a-zA-Z0-9][^\$#\/\t=]*:([^=]|\$)/ {split(\$1,A,/ /);for(i in A)print A[i]}" \' ; \
-  echo '  | grep -v Makefile \' ; \
-  echo '  | sort -u)' ; \
-  echo '}' ; \
-  echo '[[ -n ${BASH} ]] && complete -F _fzf_complete_make -o default -o bashdefault make' ; \
-  echo '[ -r "/usr/share/fzf/key-bindings.bash" ] && source "/usr/share/fzf/key-bindings.bash"' ; \
-  echo '[ -r "/usr/share/fzf/completion.bash" ] && source "/usr/share/fzf/completion.bash"' ; \
-  echo '[ -r "/usr/share/fzf/fzf-extras.bash" ] && source "/usr/share/fzf/fzf-extras.bash"' ; \
+    echo '_fzf_complete_make() {' ; \
+    echo '  FZF_COMPLETION_TRIGGER="" _fzf_complete "-1" "${@}" < <(make -pqr 2>/dev/null \' ; \
+    echo '  | awk -F":" "/^[a-zA-Z0-9][^\$#\/\t=]*:([^=]|\$)/ {split(\$1,A,/ /);for(i in A)print A[i]}" \' ; \
+    echo '  | grep -v Makefile \' ; \
+    echo '  | sort -u)' ; \
+    echo '}' ; \
+    echo '[[ -n ${BASH} ]] && complete -F _fzf_complete_make -o default -o bashdefault make' ; \
+    echo '[ -r "/usr/share/fzf/key-bindings.bash" ] && source "/usr/share/fzf/key-bindings.bash"' ; \
+    echo '[ -r "/usr/share/fzf/completion.bash" ] && source "/usr/share/fzf/completion.bash"' ; \
+    echo '[ -r "/usr/share/fzf/fzf-extras.bash" ] && source "/usr/share/fzf/fzf-extras.bash"' ; \
   ) | tee "/etc/profile.d/fzf.sh" > /dev/null || exit 1 ; \
   ( \
-  echo 'if hx --version > /dev/null 2>&1 ; then' ;\
-  echo '  export EDITOR="hx" ;' ;\
-  echo '  export VISUAL="hx" ;' ;\
-  echo '  [ ! -d "${HOME}/.config/helix" ] && mkdir -p "${HOME}/.config/helix" ;' ; \
-  echo '  wget -qO "${HOME}/.config/helix/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/helix/config.toml" ;' ; \
-  echo 'fi' ;\
+    echo 'if hx --version > /dev/null 2>&1 ; then' ;\
+    echo '  export EDITOR="hx" ;' ;\
+    echo '  export VISUAL="hx" ;' ;\
+    echo '  [ ! -d "${HOME}/.config/helix" ] && mkdir -p "${HOME}/.config/helix" ;' ; \
+    echo '  wget -qO "${HOME}/.config/helix/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/helix/config.toml" ;' ; \
+    echo 'fi' ;\
   ) | tee "/etc/profile.d/editor.sh" > /dev/null || exit 1 ; \
   # NOTE: ensures shell always has the latest gipod variables
   ( \
-  echo 'if gp version > /dev/null 2>&1 ; then' ;\
-  echo '  eval "$(gp env --export)" ;' ;\
-  echo 'fi' ;\
+    echo 'if gp version > /dev/null 2>&1 ; then' ;\
+    echo '  eval "$(gp env --export)" ;' ;\
+    echo 'fi' ;\
   ) | tee "/etc/profile.d/gitpod.sh" > /dev/null || exit 1 ; \
   echo '[ -r "${HOME}/.local/share/bash-completion/completions/git-forgit.bash" ] && source "${HOME}/.local/share/bash-completion/completions/git-forgit.bash"' > "/etc/profile.d/forgit.sh" > /dev/null || exit 1 ; \
+  npm cache clean --quiet --force ; \
+  go clean -modcache > /dev/null 2>&1 ; \
+  su-exec "${USER}" go clean -modcache > /dev/null 2>&1 ; \
+  go clean -cache > /dev/null 2>&1 ; \
+  su-exec "${USER}" go clean -cache > /dev/null 2>&1 ; \
+  rm -rf "$(go env GOPATH)/pkg/mod" ; \
   compress-packages ;
-#  ────────────────────────────────────────────────────────────
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                 rust setup                               │
-#  ╰──────────────────────────────────────────────────────────╯
-USER "root"
-ENV RUSTUP_HOME="${WORKDIR}/.rustup"
-ENV CARGO_HOME="${WORKDIR}/.cargo"
-ENV PATH="${PATH}:${CARGO_HOME}/bin"
-# hadolint ignore=SC2016
-RUN \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  pacman --quiet --noprogressbar -S --noconfirm --needed "rustup" "cargo-binstall" ; \
-  #  ────────────────────────────────────────────────────────────
-  # NOTE: installing rustup toolchains after container starts up. this helps with minimizing docker image size
-  # https://stackoverflow.com/questions/28227739/lock-a-file-in-bash-using-flock-and-lockfile
-  #  ────────────────────────────────────────────────────────────
-  rustup --version > /dev/null 2>&1 && ( \
-  echo '(' ; \
-  echo '  flock -x -n 3 || exit 55 ;' ; \
-  echo '  ! ( rustup toolchain list | grep -q "nightly" ) && rustup toolchain install nightly ;' ; \
-  echo ') 3> "/tmp/rust-nightly.lock"' ; \
-  echo '(' ; \
-  echo '  flock -x -n 4 || exit 55 ;' ; \
-  echo '  ! ( rustup toolchain list | grep -q "stable" ) && (rustup toolchain install stable && rustup default stable );' ; \
-  echo ') 4> "/tmp/rust-stable.lock"' ; \
-  echo '{' ; \
-  echo '  flock -s 3 ;' ; \
-  echo '  flock -u 3 ;' ; \
-  echo '} 3<"/tmp/rust-nightly.lock" ;' ; \
-  echo '{' ; \
-  echo '  flock -s 4 ;' ; \
-  echo '  flock -u 4 ;' ; \
-  echo '} 4<"/tmp/rust-stable.lock"' ; \
-  echo '[ -r "/tmp/rust-nightly.lock" ] && rm -f "/tmp/rust-nightly.lock" ;' ; \
-  echo '[ -r "/tmp/rust-stable.lock" ] && rm -f "/tmp/rust-stable.lock" ;' ; \
-  echo 'export RUSTUP_HOME="${HOME}/.rustup";' ; \
-  echo 'export CARGO_HOME="${HOME}/.cargo";' ; \
-  echo 'export PATH="${PATH}:${CARGO_HOME}/bin";' ; \
-  ) | tee -a "/etc/profile.d/00-rust.sh" > /dev/null \
-  && rustup default "stable" \
-  # NOTE: shisho adds a lot to build time and I don't use it at
-  # the moment so it has been commented out
-  # && cargo install --locked --git "https://github.com/flatt-security/shisho.git" \
-  && cargo binstall --quiet --no-confirm \
-  "cargo-cache" \
-  "cargo-make" \
-  "cargo-edit" \
-  "cargo-deny" \
-  "cargo-udeps" \
-  "cargo-update" \
-  "legdur" \
-  "smartcat" \
-  "aichat" \
-  "pipr" \
-  "ttdl" \
-  "prose" \
-  "jaq" \
-  && find "${CARGO_HOME}/bin" \
-  -type f \
-  -executable \
-  -exec sh -c "file -i '{}' |  grep -q -E 'application/x-(pie-)?executable; charset=binary'" \; \
-  -print \
-  | xargs \
-  -P `nproc` \
-  --no-run-if-empty \
-  bash -c ' \
-  for pkg do \
-  strip "$pkg" || true ; \
-  upx "$pkg" || true ; \
-  done' bash ; \
-  # For fixing the following error:
-  #
-  # ❯ sudo su -
-  # -bash: /etc/bash_completion.d/cargo: No such file or directory
-  ( \
-  [ -d "/usr/share/bash-completion/completions" ] && ( \
-  ( [ ! -r "/usr/share/bash-completion/completions/cargo" ] && rustup completions bash cargo > "/usr/share/bash-completion/completions/cargo" || exit 0 ; ) ; \
-  ( [ ! -r "/usr/share/bash-completion/completions/rustup" ] && rustup completions bash rustup > "/usr/share/bash-completion/completions/rustup" || exit 0 ; ) ; \
-  ) || exit 0 ; \
-  ) ; \
-  [ -r "${CARGO_HOME}/.crates.toml" ] && ( \
-  while read BIN; do \
-  ln -sf "$(which "${BIN}")" "/usr/local/bin/${BIN}" ; \
-  done < <(yq eval '.v1.*|sort|.[]' "${CARGO_HOME}/.crates.toml"); \
-  ) || exit 0 \
-  && cargo-cache --remove-dir "all" > /dev/null 2>&1 \
-  && rustup toolchain list | cut -d' ' -f1 | xargs -r -I {} rustup --quiet toolchain uninstall {}  ; \
-  compress-packages ;
-RUN du --human-readable --max-depth 1 "${HOME}" > /.rustup
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 install ruby packages                    │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -573,23 +580,6 @@ USER "root"
 # hadolint ignore=SC2016,DL3028
 RUN \
   gem install --quiet --no-user-install "bundler" "serverspec"
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                 install nodejs packages                  │
-#  ╰──────────────────────────────────────────────────────────╯
-USER "root"
-# hadolint ignore=SC2016
-RUN \
-  npm install --silent -g \
-  "github-label-sync" \
-  "remark" \
-  "remark-cli" \
-  "remark-frontmatter" \
-  "remark-stringify" \
-  "remark-toc" \
-  "remark-preset-lint-recommended" \
-  "remark-lint-list-item-indent" \
-  "remark-reference-links" \
-  && npm cache clean --quiet --force
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                      dev tools                           │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -659,64 +649,24 @@ RUN \
   && chmod +x "${HOME}/.init.d/helix.sh" \
   && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/helix.sh" \
   ) || exit 1
-#  ╭──────────────────────────────────────────────────────────╮
-#  │                  infrustructure as code                  │
-#  ╰──────────────────────────────────────────────────────────╯
-USER "root"
-# Kubernetes
-ADD --chmod=0755 "https://raw.githubusercontent.com/ahmetb/kubectl-aliases/master/.kubectl_aliases" "/etc/profile.d/01-kubectl-aliases.sh"
-# hadolint ignore=SC2016,SC2034,DL3013,DL4006
-RUN \
-  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
-  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
-  pacman --quiet -S --noconfirm --needed "helm" "kustomize" "kube-linter" "kubectl" ; \
-  kubectl version --client=true > /dev/null 2>&1 && ( \
-  echo 'eval "$(kubectl completion bash)" ;' ; \
-  ) | tee -a "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ; \
-  helm version > /dev/null 2>&1 && ( \
-  echo 'eval "$(helm completion bash)" ;' ; \
-  ) | tee -a "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ; \
-  kustomize version > /dev/null 2>&1 && ( \
-  echo 'eval "$(kustomize completion bash)" ;' ; \
-  ) | tee -a "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ; \
-  kube-linter version > /dev/null 2>&1 && ( \
-  echo 'eval "$(kube-linter completion bash)" ;' ; \
-  ) | tee -a "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ; \
-  compress-packages ;
-# hashicorp
 # hadolint ignore=SC2016,SC2034,DL3013,DL4006
 RUN \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   export PIP_NO_CACHE_DIR="off" ; \
   export MAKEFLAGS="-j$(nproc)" ; \
+  export CGO_ENABLED=1; \
+  export CGO_LDFLAGS="-g -O2" ; \
   AUR_CLONE_URLS=( \
-  "https://aur.archlinux.org/tfenv.git" \
-  "https://aur.archlinux.org/tfsec-bin.git" \
-  "https://aur.archlinux.org/tflint-bin.git" \
-  "https://aur.archlinux.org/terraform-docs-bin.git" \
+    "https://aur.archlinux.org/tflint-bin.git" \
   ) ; \
-  GROUPS_ARR=( \
-  "tfenv" \
-  "consul" \
-  "vault" \
-  ) ; \
-  pacman --quiet --noprogressbar -S --noconfirm --needed "consul" "vault" ; \
   for url in "${AUR_CLONE_URLS[@]}";do \
-  git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
-  && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
-  && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
-  for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noprogressbar --nocheck --skipinteg --noconfirm && break || sleep 15; done \
-  && popd > /dev/null 2>&1 || exit 1 ; \
-  rm -rf "/tmp/"$(basename "${url%.git}")"" ; \
-  go clean -modcache > /dev/null 2>&1 ; \
-  su-exec "${USER}" go clean -modcache > /dev/null 2>&1 ; \
-  go clean -cache > /dev/null 2>&1 ; \
-  su-exec "${USER}" go clean -cache > /dev/null 2>&1 ; \
-  done ; \
-  rm -rf "$(go env GOPATH)/pkg/mod" ; \
-  for group in "${GROUPS_ARR[@]}";do \
-  getent group "${group}" > /dev/null 2>&1 && usermod -aG "${group}" "${USER}" || continue ; \
+    git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
+    && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
+    && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
+    for i in {1..5}; do su-exec "${USER}" makepkg -sicr --noprogressbar --nocheck --skipinteg --noconfirm && break || sleep 15; done \
+    && popd > /dev/null 2>&1 || exit 1 ; \
+    rm -rf "/tmp/"$(basename "${url%.git}")"" ; \
   done ; \
   # https://jdimpson.livejournal.com/5685.html
   # https://stackoverflow.com/questions/8295908/how-to-use-a-variable-to-indicate-a-file-descriptor-in-bash
@@ -769,13 +719,11 @@ RUN \
   && chmod +x "${HOME}/.init.d/tflint.sh" \
   && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/tflint.sh"  ; \
   ) || exit 1 ; \
-  tfenv --version >/dev/null 2>&1 && ( \
-  tfenv install "latest" \
-  && tfenv use "latest" ; \
-  ) ; \
-  terraform-docs version > /dev/null 2>&1 && ( \
-  echo 'eval "$(terraform-docs completion bash)" ;' ; \
-  ) | tee "/etc/profile.d/terraform.sh" > /dev/null || exit 1 ; \
+  go clean -modcache > /dev/null 2>&1 ; \
+  su-exec "${USER}" go clean -modcache > /dev/null 2>&1 ; \
+  go clean -cache > /dev/null 2>&1 ; \
+  su-exec "${USER}" go clean -cache > /dev/null 2>&1 ; \
+  rm -rf "$(go env GOPATH)/pkg/mod" ; \
   compress-packages ;
 # Generic
 # hadolint ignore=SC2034,DL3013,DL4006,SC2016
@@ -803,11 +751,6 @@ RUN \
   && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
   for i in {1..5}; do su-exec "${USER}" makepkg -sicr --nocheck --skipinteg --noconfirm --noprogressbar && break || sleep 15; done \
   && popd > /dev/null 2>&1 || exit 1 ; \
-  rm -rf "/tmp/"$(basename "${url%.git}")"" ; \
-  go clean -modcache ; \
-  su-exec "${USER}" go clean -modcache ; \
-  go clean -cache ; \
-  su-exec "${USER}" go clean -cache ; \
   done ; \
   rm -rf "$(go env GOPATH)/pkg/mod" ; \
   for group in "${GROUPS_ARR[@]}";do \
@@ -818,12 +761,96 @@ RUN \
   driftctl version >/dev/null 2>&1 && ( \
   echo 'eval "$(driftctl completion bash)" ;' ; \
   ) | tee -a "/etc/profile.d/generic-iac.sh" > /dev/null ; \
+  rm -rf "/tmp/"$(basename "${url%.git}")"" ; \
+  go clean -modcache ; \
+  su-exec "${USER}" go clean -modcache ; \
+  go clean -cache ; \
+  su-exec "${USER}" go clean -cache ; \
   compress-packages ;
 # ────────────────────────────────────────────────────────────────────────────────
 # SHELL ["/usr/bin/pwsh", "-NoLogo", "-Command"]
 # # hadolint ignore=DL4006
 # RUN 'driftctl completion powershell | Out-String | Invoke-Expression' | Out-File -Append -Encoding ascii "$PROFILE"
 # SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+#  ╭──────────────────────────────────────────────────────────╮
+#  │                 install nodejs packages                  │
+#  ╰──────────────────────────────────────────────────────────╯
+USER "root"
+# hadolint ignore=SC2016
+RUN \
+  npm install --silent -g \
+  "github-label-sync" \
+  "remark" \
+  "remark-cli" \
+  "remark-frontmatter" \
+  "remark-stringify" \
+  "remark-toc" \
+  "remark-preset-lint-recommended" \
+  "remark-lint-list-item-indent" \
+  "remark-reference-links" \
+  && npm cache clean --quiet --force
+#  ╭──────────────────────────────────────────────────────────╮
+#  │                 install rust packages                    │
+#  ╰──────────────────────────────────────────────────────────╯
+USER "root"
+# hadolint ignore=SC2016
+RUN \
+  rustup default "stable" \
+  && cargo install \
+  # NOTE: installing xplr with pacman can lead to issues like the following:
+  #  assertion failed: tv_nsec >= 0 && tv_nsec < NSEC_PER_SEC as i64
+  #  note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace 
+  # `Aborted (core dumped)
+  "xplr" \
+  && cargo install --locked --git "https://github.com/flatt-security/shisho.git" \
+  && cargo binstall --quiet --no-confirm \
+  "cargo-cache" \
+  "cargo-make" \
+  "cargo-edit" \
+  "cargo-deny" \
+  "cargo-udeps" \
+  "cargo-update" \
+  "legdur" \
+  "smartcat" \
+  "aichat" \
+  "pipr" \
+  "ttdl" \
+  "prose" \
+  "jaq" \
+  && find "${CARGO_HOME}/bin" \
+  -type f \
+  -executable \
+  -exec sh -c "file -i '{}' |  grep -q -E 'application/x-(pie-)?executable; charset=binary'" \; \
+  -print \
+  | xargs \
+  -P `nproc` \
+  --no-run-if-empty \
+  bash -c ' \
+  for pkg do \
+  strip "$pkg" || true ; \
+  upx "$pkg" || true ; \
+  done' bash ; \
+  [ -r "${CARGO_HOME}/.crates.toml" ] && ( \
+  while read BIN; do \
+  ln -sf "$(which "${BIN}")" "/usr/local/bin/${BIN}" ; \
+  done < <(yq eval '.v1.*|sort|.[]' "${CARGO_HOME}/.crates.toml"); \
+  ) || exit 0 \
+  && cargo-cache --remove-dir "all" > /dev/null 2>&1 \
+  && rustup toolchain list | cut -d' ' -f1 | xargs -r -I {} rustup --quiet toolchain uninstall {}  ; \
+  # ────────────────────────────────────────────────────────────
+  # NOTE: xplr config
+  # ────────────────────────────────────────────────────────────
+  xplr --version > /dev/null 2>&1 && ( \
+  echo '[ ! -d "${HOME}/.config/xplr" ] && mkdir -p "${HOME}/.config/xplr" ;' ; \
+  echo 'wget -qO "${HOME}/.config/xplr/init.lua" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/xplr/init.lua" ;' ; \
+  ) | tee "/etc/profile.d/xplr.sh" > /dev/null  || exit 1 ; \
+  # ────────────────────────────────────────────────────────────
+  # NOTE: cargo-make config
+  # ────────────────────────────────────────────────────────────
+  [ -n "$(which "cargo-make" 2>/dev/null)" ] && ( \
+    COMPL_URL="https://raw.githubusercontent.com/sagiegurari/cargo-make/master/extra/shell/makers-completion.bash" ; \
+    wget -qO "/etc/bash_completion.d/$(basename -s.bash "${COMPL_URL}")" "${COMPL_URL}" || echo "$(basename -s.bash "${COMPL_URL}") bash completion" >> /.failures ; \
+  ) || exit 1 ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                   extra packages                         │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -841,6 +868,9 @@ RUN \
   && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" \
   "${WORKDIR}" "${HOME}" \
   && paru -S --noconfirm --needed \
+  "chaotic-aur/dragon-drop-git" \
+  "dua-cli" \
+  "ouch" \
   "markdownlint" \
   "consul-template" \
   "packer" \
@@ -935,8 +965,9 @@ RUN \
   "aur/dockerfile-language-server-bin" \
   "aur/terraform-ls-bin" \
   && curl -fsSL "https://plandex.ai/install.sh" | bash > /dev/null 2>&1 \
-  && go install \
-  "github.com/Gelio/go-global-update@latest" \
+  && go install "github.com/Gelio/go-global-update@latest" \
+  && go install "github.com/doronbehar/pistol/cmd/pistol@latest" \
+  && npm cache clean --quiet --force  \
   && go clean -modcache > /dev/null 2>&1 \
   && su-exec "${USER}" go clean -modcache > /dev/null 2>&1 \
   && go clean -cache > /dev/null 2>&1 \
@@ -1094,7 +1125,10 @@ RUN \
   && chown "$(id -u "${USER}"):$(id -g "${USER}")" '/entrypoint';
 
 # RUN du --human-readable --max-depth 1 "${HOME}" > /.size \ && expac --humansize M "%n %m" -l'\n' -Q $(pacman -Qq) | sort -hk 2 > /.package-size
-
+#  ────────────────────────────────────────────────────────────
+# NOTE: extra helper scripts
+ADD --chmod=0755 "https://raw.githubusercontent.com/ahmetb/kubectl-aliases/master/.kubectl_aliases" "/etc/profile.d/01-kubectl-aliases.sh"
+#  ────────────────────────────────────────────────────────────
 USER "${USER}"
 VOLUME ["${HOME}","${WORKDIR}"]
 ENV TERM="xterm"

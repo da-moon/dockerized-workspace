@@ -28,7 +28,7 @@ group "default" {
 }
 target "default" {
   context    = "."
-  dockerfile = ".gp/Dockerfile"
+  dockerfile = "gitpod/Dockerfile"
   # https://wiki.archlinux.org/title/docker
   ulimits = [
     "nofile=1024:524288"
