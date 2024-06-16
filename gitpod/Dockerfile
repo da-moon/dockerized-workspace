@@ -427,6 +427,7 @@ RUN \
   "zoxide" \
   "ripgrep" \
   "eza" \
+  "xplr" \
   "atuin" \
   "bash-preexec" \
   "bat" \
@@ -512,6 +513,10 @@ RUN \
     echo 'alias llt="eza -T" ;' ; \
     echo 'alias ls="eza" ;' ; \
   ) | tee "/etc/profile.d/eza.sh" > /dev/null || exit 1 ; \
+  xplr --version > /dev/null 2>&1 && ( \
+    echo '[ ! -d "${HOME}/.config/xplr" ] && mkdir -p "${HOME}/.config/xplr" ;' ; \
+    echo 'wget -qO "${HOME}/.config/xplr/init.lua" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/xplr/init.lua" ;' ; \
+  ) | tee "/etc/profile.d/xplr.sh" > /dev/null  || exit 1 ; \
   gh --version > /dev/null 2>&1 && ( \
     echo 'eval "$(gh completion -s bash)" ;' > "/etc/profile.d/gh.sh" ; \
     pwsh --version && ( \
@@ -801,12 +806,6 @@ USER "root"
 # hadolint ignore=SC2016
 RUN \
   rustup default "stable" \
-  && cargo install \
-  # NOTE: installing xplr with pacman can lead to issues like the following:
-  #  assertion failed: tv_nsec >= 0 && tv_nsec < NSEC_PER_SEC as i64
-  #  note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace 
-  # `Aborted (core dumped)
-  "xplr" \
   && cargo install --locked --git "https://github.com/flatt-security/shisho.git" \
   && cargo binstall --quiet --no-confirm \
   "cargo-cache" \
@@ -842,13 +841,6 @@ RUN \
   ) || exit 0 \
   && cargo-cache --remove-dir "all" > /dev/null 2>&1 \
   && rustup toolchain list | cut -d' ' -f1 | xargs -r -I {} rustup --quiet toolchain uninstall {}  ; \
-  # ────────────────────────────────────────────────────────────
-  # NOTE: xplr config
-  # ────────────────────────────────────────────────────────────
-  xplr --version > /dev/null 2>&1 && ( \
-  echo '[ ! -d "${HOME}/.config/xplr" ] && mkdir -p "${HOME}/.config/xplr" ;' ; \
-  echo 'wget -qO "${HOME}/.config/xplr/init.lua" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/xplr/init.lua" ;' ; \
-  ) | tee "/etc/profile.d/xplr.sh" > /dev/null  || exit 1 ; \
   # ────────────────────────────────────────────────────────────
   # NOTE: cargo-make config
   # ────────────────────────────────────────────────────────────
