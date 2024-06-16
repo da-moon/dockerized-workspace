@@ -379,12 +379,12 @@ RUN \
   echo "alias alpine-c='docker-run -w \"/workspace\" alpine:edge' ;" ; \
   echo "alias pureos-c='docker-run -w \"/workspace\" pureos/pureos:byzantium-slim' ;" ; \
   echo "alias arch-c='docker-run -w \"/workspace\" archlinux bash -c \"pacman-key --init && pacman-key --populate \"archlinux\" && exec bash --login\"' ;" ; \
-  echo "alias gitlint='docker run -u \"\$(id -u):\$(id -g)\" -w \"/repo\" --rm -it --ulimit nofile=1024 -v \"\$(pwd):/repo\" \"jorisroovers/gitlint\"' ;" ; \
   echo "alias gitleaks='docker run -u \"\$(id -u):\$(id -g)\" -v \"\$(pwd):/path\" -w \"/path\" --rm -it \"zricethezav/gitleaks:latest\"' ;" ; \
   echo "alias code-server='docker-run --network host -d -u \"\$(id -u):\$(id -g)\" \"codercom/code-server:latest\" --auth none' ;" ; \
   echo "alias rmcontainers='docker ps -aq | xargs -r docker rm -f' ;" ; \
   echo "alias gitlint='docker run -u \"\$(id -u):\$(id -g)\" -w \"/repo\" --rm -it --ulimit nofile=1024 -v \"\$(pwd):/repo\" \"jorisroovers/gitlint\"' ;" ; \
   echo "alias reveal-md='docker run --rm  -u \"\$(id -u):\$(id -g)\" -p \"1948:1948\" -p \"35729:35729\" -v \"\$(pwd):/slides\" \"webpronl/reveal-md:latest\" /slides --watch' ;" ; \
+  echo 'alias mlflow="docker run --rm -it -u $(id -u):$(id -g) -w /workspace -v $(pwd):/workspace -p 5000:5000 ghcr.io/mlflow/mlflow:latest mlflow ui --host 0.0.0.0"' ; \
   ) | tee "/etc/profile.d/docker.sh" > /dev/null || exit 1 ; \
   compress-packages ;
 #  ╭──────────────────────────────────────────────────────────╮
