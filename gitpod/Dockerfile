@@ -179,6 +179,7 @@ RUN \
   "wget" \
   "curl" \
   "jq" \
+  "go-yq" \
   "unzip" \
   "unrar" \
   "expac" \
@@ -328,6 +329,7 @@ RUN \
       ( [ ! -r "/usr/share/bash-completion/completions/rustup" ] && rustup completions bash rustup > "/usr/share/bash-completion/completions/rustup" || exit 0 ; ) ; \
     ) || exit 0 ; \
   ) ; \
+  yq --version > /dev/null 2>&1 && echo 'eval "$(yq shell-completion bash)" ;' | tee "/etc/profile.d/yq.sh" > /dev/null || exit 1 ; \
   compress-packages ;
 # ──────────────────────────────────────────────────────────
 USER "${USER}"
@@ -419,7 +421,6 @@ RUN \
   "consul" "vault" \
   "starship" \
   "fzf" \
-  "go-yq" \
   "github-cli" \
   "git-delta" \
   "difftastic" \
@@ -448,7 +449,6 @@ RUN \
   mkdir -p "${HOME}/.local/share/bash-completion/completions" ; \
   starship --version > /dev/null 2>&1 && echo 'eval "$(starship init bash)" ;' | tee "/etc/profile.d/starship.sh" > /dev/null || exit 1 ; \
   just --version > /dev/null 2>&1 && echo 'eval "$(just --completions bash)" ;' | tee "/etc/profile.d/just.sh" > /dev/null || exit 1 ; \
-  yq --version > /dev/null 2>&1 && echo 'eval "$(yq shell-completion bash)" ;' | tee "/etc/profile.d/yq.sh" > /dev/null || exit 1 ; \
   poetry --version > /dev/null 2>&1 && echo 'eval "$(poetry completions bash)" ;' | tee "/etc/profile.d/poetry.sh" > /dev/null || exit 1 ; \
   kubectl version --client=true > /dev/null 2>&1 && echo 'eval "$(kubectl completion bash)" ;' | tee "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ; \
   helm version > /dev/null 2>&1 && echo 'eval "$(helm completion bash)" ;' | tee -a "/etc/profile.d/kubernetes.sh" > /dev/null || exit 1 ; \
@@ -557,6 +557,7 @@ RUN \
     echo '  export VISUAL="hx" ;' ;\
     echo '  [ ! -d "${HOME}/.config/helix" ] && mkdir -p "${HOME}/.config/helix" ;' ; \
     echo '  wget -qO "${HOME}/.config/helix/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/helix/config.toml" ;' ; \
+    echo '  wget -qO "${HOME}/.config/helix/languages.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/helix/languages.toml" ;' ; \
     echo 'fi' ;\
   ) | tee "/etc/profile.d/editor.sh" > /dev/null || exit 1 ; \
   # NOTE: ensures shell always has the latest gipod variables
@@ -634,30 +635,49 @@ RUN \
   && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" \
   "${HOME}/.local/bin" \
   "${HOME}/.config/helix" \
-  && hx --version > /dev/null 2>&1 && ( \
-  [ ! -d "${HOME}/.init.d/" ] && ( mkdir -p "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
-  ( \
-  echo '#!/usr/bin/env bash' ; \
-  echo 'if [ ! -d "${HOME}/.config/helix/runtime/grammars/sources" ]; then' ; \
-  echo '  self="$(realpath -s "${BASH_SOURCE[0]}")";' ; \
-  echo '  lockfile="/tmp/$(basename -s.sh "${self}").lock" ;' ; \
-  echo '  (' ; \
-  echo '    flock -x -n 20 || exit 55 ;' ; \
-  echo '    wget -qO "${HOME}/.config/helix/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/helix/config.toml"' ; \
-  echo '    # hx --grammar fetch' ; \
-  echo '    # hx --grammar build' ; \
-  echo '  ) 20> "${lockfile}"' ; \
-  echo '  {' ; \
-  echo '    flock -s 20 ;' ; \
-  echo '    echo "[ $(basename -s.sh "${self}") ] : cleaning up self..." ;' ; \
-  echo '    flock -u 20 ;' ; \
-  echo '    rm -f "${self}" ;' ; \
-  echo '  } 20<"${lockfile}"' ; \
-  echo '  [ -r "${lockfile}" ] && rm -f "${lockfile}" ;' ; \
-  echo 'fi' ; \
-  ) | tee "${HOME}/.init.d/helix.sh" > /dev/null \
-  && chmod +x "${HOME}/.init.d/helix.sh" \
-  && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/helix.sh" \
+  && hx --version > /dev/null 2>&1 \
+  # NOTE: install helix-gpt language server
+  && ( \
+    architecture="$(uname -m)" ; \
+    REPO="leona/helix-gpt" ; \
+    url="https://api.github.com/repos/${REPO}/releases/latest" ; \
+    wget -qO - "${url}" \
+    | jq -r "\
+    .assets[]|select(\
+    .browser_download_url \
+    | (\
+      contains(\"${architecture}\") \
+      and contains(\"linux\") \
+      and (contains(\"sha256\") | not) \
+    )).browser_download_url" \
+    | xargs -r -I {} wget -qO - {} 2> /dev/null \
+    | tar -C "/usr/local/bin" -xvzf- --transform 's/.*/helix-gpt/' \
+    && chmod +x "/usr/local/bin/helix-gpt"; \
+  ) \
+  && ( \
+    [ ! -d "${HOME}/.init.d/" ] && ( mkdir -p "${HOME}/.init.d" && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d") ; \
+    ( \
+    echo '#!/usr/bin/env bash' ; \
+    echo 'if [ ! -d "${HOME}/.config/helix/runtime/grammars/sources" ]; then' ; \
+    echo '  self="$(realpath -s "${BASH_SOURCE[0]}")";' ; \
+    echo '  lockfile="/tmp/$(basename -s.sh "${self}").lock" ;' ; \
+    echo '  (' ; \
+    echo '    flock -x -n 20 || exit 55 ;' ; \
+    echo '    wget -qO "${HOME}/.config/helix/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/helix/config.toml"' ; \
+    echo '    # hx --grammar fetch' ; \
+    echo '    # hx --grammar build' ; \
+    echo '  ) 20> "${lockfile}"' ; \
+    echo '  {' ; \
+    echo '    flock -s 20 ;' ; \
+    echo '    echo "[ $(basename -s.sh "${self}") ] : cleaning up self..." ;' ; \
+    echo '    flock -u 20 ;' ; \
+    echo '    rm -f "${self}" ;' ; \
+    echo '  } 20<"${lockfile}"' ; \
+    echo '  [ -r "${lockfile}" ] && rm -f "${lockfile}" ;' ; \
+    echo 'fi' ; \
+    ) | tee "${HOME}/.init.d/helix.sh" > /dev/null \
+    && chmod +x "${HOME}/.init.d/helix.sh" \
+    && chown "$(id -u "${USER}"):$(id -g "${USER}")" "${HOME}/.init.d/helix.sh" \
   ) || exit 1
 # hadolint ignore=SC2016,SC2034,DL3013,DL4006
 RUN \
@@ -802,6 +822,9 @@ RUN \
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 install rust packages                    │
 #  ╰──────────────────────────────────────────────────────────╯
+ARG AICHAT_CONFIG_DIR="${HOME}/.config/aichat"
+ENV AICHAT_CONFIG_DIR="${AICHAT_CONFIG_DIR}"
+ARG AICHAT_CONFIG_FILE="${AICHAT_CONFIG_DIR}/config.yaml" 
 USER "root"
 # hadolint ignore=SC2016
 RUN \
@@ -842,12 +865,34 @@ RUN \
   && cargo-cache --remove-dir "all" > /dev/null 2>&1 \
   && rustup toolchain list | cut -d' ' -f1 | xargs -r -I {} rustup --quiet toolchain uninstall {}  ; \
   # ────────────────────────────────────────────────────────────
+  # NOTE: aichat config
+  # ────────────────────────────────────────────────────────────
+  [ -n "$(which "aichat" 2>/dev/null)" ] && ( \
+    mkdir -p "${AICHAT_CONFIG_DIR}" \
+    && yq eval --null-input '.model = "mistral:mistral-large-latest"' \
+      | tee "${AICHAT_CONFIG_FILE}" > /dev/null \
+    && yq eval '. head_comment="model: openai:gpt-4o\nmodel: vertexai:gemini-1.5-pro-preview-0514\nmodel: mistral:mistral-large-latest"' -i "${AICHAT_CONFIG_FILE}" \
+    && yq eval '.save_session = true' -i "${AICHAT_CONFIG_FILE}" \
+    && yq eval '.clients = []' -i "${AICHAT_CONFIG_FILE}" \
+    && yq eval '.clients += {"type": "openai"}' -i "${AICHAT_CONFIG_FILE}" \
+    && yq eval '.clients += {"type": "openai-compatible", "name": "mistral"}' -i "${AICHAT_CONFIG_FILE}" \
+    && ( \
+      echo 'if [ -n "${VERTEXAI_API_KEY+x}" ] && [ -n "${VERTEXAI_API_KEY}" ] && [ -n "${VERTEX_AI_PROJECT_ID+x}" ] && [ -n "${VERTEX_AI_PROJECT_ID}" ] && [ -n "{VERTEX_AI_LOCATION+x}" ] && [ -n "${VERTEX_AI_LOCATION}" ]; then' ; \
+      echo '  yq eval "' ; \
+      echo '  .clients += {\"type\": \"vertexai\"} |' ; \
+      echo '  .model = \"vertexai:gemini-1.5-pro-preview-0514\"' ; \
+      echo '  " -i "${AICHAT_CONFIG_FILE}" ; \' ; \
+      echo 'fi ;' ; \
+      echo 'alias aichat="aichat --session \"\"\$(date -u +\"%Y-week-%V\")\"-\"\$(basename \"\$(pwd)\")\"\"" ; \' ; \
+    ) | tee "/etc/profile.d/aichat.sh" > /dev/null ; \
+  ) ; \
+  # ────────────────────────────────────────────────────────────
   # NOTE: cargo-make config
   # ────────────────────────────────────────────────────────────
   [ -n "$(which "cargo-make" 2>/dev/null)" ] && ( \
     COMPL_URL="https://raw.githubusercontent.com/sagiegurari/cargo-make/master/extra/shell/makers-completion.bash" ; \
     wget -qO "/etc/bash_completion.d/$(basename -s.bash "${COMPL_URL}")" "${COMPL_URL}" || echo "$(basename -s.bash "${COMPL_URL}") bash completion" >> /.failures ; \
-  ) || exit 1 ;
+  ) ;
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                   extra packages                         │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -861,7 +906,9 @@ RUN \
   export MAKEFLAGS="-j$(nproc)" ; \
   export CGO_ENABLED=1 ; \
   export CGO_LDFLAGS="-g -O2" ; \
-  mkdir -p "${HOME}/.local/state/paru" \
+  mkdir -p \
+    "${HOME}/.local/state/paru" \
+    "${WORKDIR}" \
   && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" \
   "${WORKDIR}" "${HOME}" \
   && paru -S --noconfirm --needed \
