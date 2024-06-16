@@ -836,6 +836,7 @@ RUN \
   && cargo install --locked --git "https://github.com/flatt-security/shisho.git" \
   && cargo binstall --quiet --no-confirm \
   "cargo-cache" \
+  "cargo-watch" \
   "cargo-make" \
   "cargo-edit" \
   "cargo-deny" \
