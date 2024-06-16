@@ -1,12 +1,13 @@
 ---
 image:
   fjolsvin/gp-archlinux-workspace:latest
-  # file: .gp/Dockerfile
+  # file: gitpod/Dockerfile
   # context: .
 tasks:
   - name: update-packages
     openMode: tab-before
     command: |
+      eval "$(gp env --export)" ;
       if [ -x "$(command -v topgrade)" ]; then
         topgrade \
         --disable "vscode" \
@@ -26,6 +27,7 @@ tasks:
       exit 0 ;
   - name: setup-pre-commit
     command: |
+      eval "$(gp env --export)" ;
       ! pre-commit --version > /dev/null 2>&1 \
       && python3 -m pip install pre-commit --version > /dev/null 2>&1 \
       && (
@@ -42,6 +44,7 @@ tasks:
     # NOTE: Gitpod buildx cache persists workspace reboots which can cause
     # the workspace to run out of space
     command: |
+      eval "$(gp env --export)" ;
       docker buildx prune --builder default --all --force \
       && docker buildx create \
         --use \
@@ -52,6 +55,7 @@ tasks:
   - name: setup-sourcehut-ssh-key
     openMode: tab-before
     command: |
+      eval "$(gp env --export)" ;
       [ ! -d "${HOME}/.ssh" ] && mkdir "${HOME}/.ssh" ;
       if [ -n "${SOURCEHUT_PRIVATE_KEY+x}" ] \
         && [ -n "${SOURCEHUT_PRIVATE_KEY}" ]; then
@@ -78,6 +82,7 @@ tasks:
   - name: setup-makedeb-ssh-key
     openMode: tab-before
     command: |
+      eval "$(gp env --export)" ;
       [ ! -d "${HOME}/.ssh" ] && mkdir "${HOME}/.ssh" ;
       if [ -n "${MAKEDEB_PRIVATE_KEY+x}" ] \
         && [ -n "${MAKEDEB_PRIVATE_KEY}" ]; then
@@ -104,6 +109,7 @@ tasks:
   - name: setup-github-ssh-key
     openMode: tab-before
     command: |
+      eval "$(gp env --export)" ;
       [ ! -d "${HOME}/.ssh" ] && mkdir "${HOME}/.ssh" ;
       if [ -n "${GITHUB_PRIVATE_KEY+x}" ] \
         && [ -n "${GITHUB_PRIVATE_KEY}" ]; then
@@ -149,6 +155,7 @@ tasks:
   - name: git-config
     openMode: tab-before
     command: |
+      eval "$(gp env --export)" ;
       ( [ -n "${GITHUB_EMAIL+x}" ] && [ -n "${GITHUB_EMAIL}" ] && git config --global user.email "${GITHUB_EMAIL}" || true ) \
       && git config --global gpg.format "ssh" \
       && git config --global commit.gpgsign true \
