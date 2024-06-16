@@ -885,7 +885,7 @@ RUN \
       echo '  yq eval "' ; \
       echo '  .clients += {\"type\": \"vertexai\"} |' ; \
       echo '  .model = \"vertexai:gemini-1.5-pro-preview-0514\"' ; \
-      echo '  " -i "${AICHAT_CONFIG_FILE}" ; \' ; \
+      echo '  " -i "${AICHAT_CONFIG_DIR}/config.yaml" ; \' ; \
       echo 'fi ;' ; \
       echo 'alias aichat="aichat --session \"\"\$(date -u +\"%Y-week-%V\")\"-\"\$(basename \"\$(pwd)\")\"\"" ; \' ; \
     ) | tee "/etc/profile.d/aichat.sh" > /dev/null ; \
@@ -921,6 +921,11 @@ RUN \
 #  │                   VNC setup                              │
 #  ╰──────────────────────────────────────────────────────────╯
 # https://github.com/gitpod-io/workspace-images/blob/main/chunks/tool-vnc/Dockerfile
+# extra/x11vnc
+# extra/openbox
+# WINDOW_MANAGER=openbox
+# VNC_PORT=5900
+# NOVNC_PORT=6080
 # hadolint ignore=SC2034,DL3013,DL4006,SC2016
 RUN \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
