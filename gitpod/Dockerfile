@@ -897,6 +897,116 @@ RUN \
     COMPL_URL="https://raw.githubusercontent.com/sagiegurari/cargo-make/master/extra/shell/makers-completion.bash" ; \
     wget -qO "/etc/bash_completion.d/$(basename -s.bash "${COMPL_URL}")" "${COMPL_URL}" || echo "$(basename -s.bash "${COMPL_URL}") bash completion" >> /.failures ; \
   ) ;
+# #  ╭──────────────────────────────────────────────────────────╮
+# #  │                   Datascience Packages                   │
+# #  ╰──────────────────────────────────────────────────────────╯
+# # TODO: create a script for bootstrapping these packages
+# # hadolint ignore=SC2034,DL3013,DL4006,SC2016
+# RUN \
+#   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
+#   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
+#   pacman --quiet --noprogressbar -S --noconfirm --needed \
+#   "python-networkx" \
+#   "python-matplotlib" \
+#   "python-sympy" \
+#   "python-tabulate" \
+#   "python-pandas" \
+#   "python-numpy" \
+#   ; \
+#   python3 -m pip install -q --no-cache-dir --break-system-packages \
+#   "tsplib95" ; \
+#   compress-packages ;
+
+#  ╭──────────────────────────────────────────────────────────╮
+#  │                   VNC setup                              │
+#  ╰──────────────────────────────────────────────────────────╯
+# https://github.com/gitpod-io/workspace-images/blob/main/chunks/tool-vnc/Dockerfile
+# hadolint ignore=SC2034,DL3013,DL4006,SC2016
+RUN \
+  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
+  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
+  export PIP_NO_CACHE_DIR="off" ; \
+  export MAKEFLAGS="-j$(nproc)" ; \
+  export CGO_ENABLED=1; \
+  export CGO_LDFLAGS="-g -O2" ; \
+  AUR_CLONE_URLS=( \
+  # NOTE: this has to be the first package installed by AUR
+  "https://aur.archlinux.org/websockify.git" \
+  "https://aur.archlinux.org/novnc.git" \
+  ) ; \
+  for url in "${AUR_CLONE_URLS[@]}";do \
+  git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
+  && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
+  && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
+  for i in {1..5}; do su-exec "${USER}" makepkg -sicr --nocheck --skipinteg --noconfirm --noprogressbar && break || sleep 15; done \
+  && popd > /dev/null 2>&1 || exit 1 ; \
+  rm -rf "/tmp/"$(basename "${url%.git}")"" ; \
+  done ; \
+  # NOTE: you need to use tk backend. e.g for plotting with `matplotlib` , you have to import the library like the following example
+  # 
+  # ```python
+  # import matplotlib
+  # matplotlib.use('TkAgg')
+  # ```
+  #
+  pacman --quiet --noprogressbar -S --noconfirm --needed \
+  "tk" \
+  "dbus" \
+  "xdg-utils" \
+  "gnome-keyring" \
+  "xfce4" \
+  "xfce4-terminal" \
+  "tigervnc" \
+  ; \
+  compress-packages ;
+
+COPY <<-"EOT" /opt/novnc/index.html
+<html><head><meta http-equiv="Refresh" content="0; url=vnc.html?autoconnect=true&reconnect=true&resize=scale"></head></html>
+EOT
+COPY --chmod=0755 <<-"EOT" /usr/local/bin/gp-vncsession
+#!/usr/bin/env bash
+set -eu
+function start_service() {
+	local executable="$1" && shift
+	local executable_name="${executable##*/}"
+	local args=("$@")
+	start-stop-daemon --make-pidfile --pidfile "/tmp/${executable_name}.pid" --remove-pidfile \
+		--quiet --background --start \
+		--startas "$BASH" -- -c "exec $executable ${args[*]} > /tmp/${executable_name}.log 2>&1"
+}
+function log::info() {
+	printf 'info[%s]: %s\n' "${0##*/}" "$@"
+}
+if test ! -e /tmp/.X0-lock; then {
+	: "${DISPLAY:=":0"}"
+	export DISPLAY
+	VNC_PORT=5900
+	NOVNC_PORT=6080
+	if ! mount | grep '/dev/shm.*size=4194304k' 1>/dev/null; then {
+		sudo mount -t tmpfs shm -osize=4096m /dev/shm && log::info "Increased shmem to 4GB" ||
+			log::info "Failed to increase shmem"
+	}; fi
+	log::info "$(sudo service dbus start | xargs)"
+	chmod 755 "$HOME/.xinitrc"
+	log::info "Starting tigerVNC server on port $VNC_PORT"
+	start_service "$(command -v vncserver)" -geometry "${TIGERVNC_GEOMETRY:-1920x1080}" -SecurityTypes None $DISPLAY
+	log::info "Waiting for the desktop to be fully loaded ..."
+	until pgrep xfdesktop 1>/dev/null; do {
+		sleep 0.2
+	}; done
+	log::info "Starting noVNC web client on port $NOVNC_PORT"
+	start_service "$BASH" /opt/novnc/utils/novnc_proxy --vnc localhost:${VNC_PORT} --listen ${NOVNC_PORT}
+}; fi
+EOT
+COPY --chmod=0755 <<-"EOT" /etc/profile.d/500-vnc.sh
+export DISPLAY=:0
+test -e "$GITPOD_REPO_ROOT" && gp-vncsession
+EOT
+COPY --chown="${USER}:${USER}" <<-"EOT" "${HOME}/.xinitrc"
+: "${DISPLAY:=":0"}"
+export DISPLAY
+exec dbus-launch --exit-with-session xfce4-session
+EOT
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                   extra packages                         │
 #  ╰──────────────────────────────────────────────────────────╯
@@ -1181,6 +1291,8 @@ USER "${USER}"
 VOLUME ["${HOME}","${WORKDIR}"]
 # NOTE: fixing environment variables
 ENV TERM="xterm"
+# NOTE: ignore pip warning for installing system packages
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 ENV DOCKER_BUILDKIT="1"
 ENV BUILDKIT_PROGRESS="plain"
 ENV GO_PATH="${WORKDIR}/.go"

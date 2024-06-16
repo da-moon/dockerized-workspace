@@ -66,6 +66,9 @@ ports:
     description: syncthing UI
     onOpen: ignore
     visibility: private
+  - port: 6080
+    onOpen: open-preview
+    description: VNC
 github:
   prebuilds:
     master: true
