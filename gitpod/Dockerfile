@@ -22,15 +22,16 @@ VOLUME [ "${WORKDIR}" ]
 #  ╰──────────────────────────────────────────────────────────╯
 # hadolint ignore=SC2016
 RUN \
-  sed \
-  -e '/XDG_/d' \
-  -e '$aXDG_CACHE_HOME  DEFAULT=@{WORKDIR}/.cache' \
-  -e '$aXDG_CONFIG_HOME DEFAULT=@{WORKDIR}/.config' \
-  -e '$aXDG_DATA_HOME   DEFAULT=@{WORKDIR}/.local/share' \
-  -e '$aXDG_STATE_HOME  DEFAULT=@{WORKDIR}/.local/state' \
-  "/etc/security/pam_env.conf" \
+  # NOTE: it looks like Gitpod overrides the config for pam_env.conf
+  # sed \
+  # -e '/XDG_/d' \
+  # -e '$aXDG_CACHE_HOME  DEFAULT=@{WORKDIR}/.cache' \
+  # -e '$aXDG_CONFIG_HOME DEFAULT=@{WORKDIR}/.config' \
+  # -e '$aXDG_DATA_HOME   DEFAULT=@{WORKDIR}/.local/share' \
+  # -e '$aXDG_STATE_HOME  DEFAULT=@{WORKDIR}/.local/state' \
+  # "/etc/security/pam_env.conf" ; \
   # ─── DOWNLOAD SIXTEEN PACKAGES CONCURRENTLY ─────────────────────────────────────
-  && sed -i \
+  sed -i \
   -e "/ParallelDownloads/d" \
   -e  '/\[options\]/a ParallelDownloads = 16' \
   "/etc/pacman.conf" \
@@ -141,23 +142,24 @@ RUN \
   ) | tee "/usr/local/bin/compress-packages" > /dev/null \
   && chmod +x "/usr/local/bin/compress-packages" ;
 # ──────────────────────────────────────────────────────────
-ENV GEM_PATH="${WORKDIR}/.gem"
+ENV GEM_PATH="${HOME}/.gem"
 
-ENV npm_config_prefix="${WORKDIR}/.npm"
+ENV npm_config_prefix="${HOME}/.npm"
 ENV PATH="${PATH}:${npm_config_prefix}/bin"
 
-ENV GO_PATH="${WORKDIR}/.go"
+ENV GO_PATH="${HOME}/.go"
 ENV GO111MODULE="on"
 ENV CGO_ENABLED="0"
 ENV CGO_LDFLAGS="-s -w -extldflags '-static'"
 ENV PATH="${PATH}:${GO_PATH}/bin"
 
-ENV RUSTUP_HOME="${WORKDIR}/.rustup"
-ENV CARGO_HOME="${WORKDIR}/.cargo"
+ENV RUSTUP_HOME="${HOME}/.rustup"
+ENV CARGO_HOME="${HOME}/.cargo"
 ENV PATH="${PATH}:${CARGO_HOME}/bin"
 
 ENV PATH="${PATH}:${HOME}/.local/bin"
 ENV PATH="${PATH}:${HOME}/.luarocks/bin"
+
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
@@ -191,7 +193,6 @@ RUN \
   #  │                     go setup                             │
   #  ╰──────────────────────────────────────────────────────────╯
   go version > /dev/null 2>&1 && ( \
-    echo "export GOPATH=\"${GO_PATH}\";" ; \
     echo "export GO111MODULE=\"${GO111MODULE}\";" ; \
     echo "export CGO_ENABLED=\"${CGO_ENABLED}\";" ; \
     echo 'export PATH="${PATH}:$(go env GOPATH)/bin";' ; \
@@ -200,7 +201,6 @@ RUN \
   #  │                     ruby setup                           │
   #  ╰──────────────────────────────────────────────────────────╯
   gem --version > /dev/null 2>&1 && ( \
-    echo "export GEM_PATH=\"${GEM_PATH}\";" ; \
     echo 'export GEM_HOME="$(ruby -e "puts Gem.user_dir")";' ; \
     echo 'export PATH="${PATH}:${GEM_HOME}/bin";' ; \
   ) | tee "/etc/profile.d/ruby.sh" > /dev/null || exit 1 ; \
@@ -208,7 +208,6 @@ RUN \
   #  │                 nodejs setup                             │
   #  ╰──────────────────────────────────────────────────────────╯
   npm version > /dev/null 2>&1 && ( \
-    echo "export npm_config_prefix=\"${npm_config_prefix}\";" ; \
     echo 'export PATH="${PATH}:$(npm config get prefix)/bin";' ; \
   ) | tee "/etc/profile.d/npm.sh" > /dev/null || exit 1 ; \
   yarn --version > /dev/null 2>&1 && ( \
@@ -317,8 +316,6 @@ RUN \
     echo '} 4<"/tmp/rust-stable.lock"' ; \
     echo '[ -r "/tmp/rust-nightly.lock" ] && rm -f "/tmp/rust-nightly.lock" ;' ; \
     echo '[ -r "/tmp/rust-stable.lock" ] && rm -f "/tmp/rust-stable.lock" ;' ; \
-    echo "export RUSTUP_HOME=\"${RUSTUP_HOME}\";" ; \
-    echo "export CARGO_HOME=\"${CARGO_HOME}\";" ; \
     echo 'export PATH="${PATH}:${CARGO_HOME}/bin";' ; \
   ) | tee -a "/etc/profile.d/00-rust.sh" > /dev/null ; \
   # For fixing the following error:
@@ -471,7 +468,7 @@ RUN \
     echo 'alias tfw="terraform workspace" ;' ; \
     echo 'alias tfwl="terraform workspace list" ;' ; \
     echo 'alias tfws="terraform workspace select" ;' ; \
-  ) | tee "/etc/profile.d/eza.sh" > /dev/null || exit 1 ; \
+  ) | tee "/etc/profile.d/terraform.sh" > /dev/null || exit 1 ; \
   # ─── USE DELTA FOR GIT DIFFS ────────────────────────────────────────────────────
   delta --version > /dev/null 2>&1 && ( \
     git config --system pager.diff delta \
@@ -533,9 +530,7 @@ RUN \
   ) || exit 1 ; \
   atuin --version > /dev/null 2>&1 && ( \
     echo '[ ! -d "${HOME}/.config/atuin" ] && mkdir -p "${HOME}/.config/atuin" ;' ; \
-    echo 'wget -qO "${HOME}/.config/atuin/config.toml" "https://raw.githubusercontent.com/da-moon/.dotfiles/master/config/atuin/config.toml" ;' ; \
-    echo 'sed -i -e "/db_path/d" "${HOME}/.config/atuin/config.toml" ;' ; \
-    echo "echo 'db_path = \"${WORKDIR}/.history.db\"' >> '${HOME}/.config/atuin/config.toml' ;" ; \
+    echo "echo 'db_path = \"${WORKDIR}/.history.db\"' > '${HOME}/.config/atuin/config.toml' ;" ; \
     echo '[[ -r "/usr/share/bash-preexec/bash-preexec.sh" ]] && source "/usr/share/bash-preexec/bash-preexec.sh"' ; \
     echo 'eval "$(atuin init bash)" ;' ; \
   ) | tee "/etc/profile.d/atuin.sh" > /dev/null || exit 1 ; \
@@ -1131,9 +1126,15 @@ ADD --chmod=0755 "https://raw.githubusercontent.com/ahmetb/kubectl-aliases/maste
 #  ────────────────────────────────────────────────────────────
 USER "${USER}"
 VOLUME ["${HOME}","${WORKDIR}"]
+# NOTE: fixing environment variables
 ENV TERM="xterm"
 ENV DOCKER_BUILDKIT="1"
 ENV BUILDKIT_PROGRESS="plain"
+ENV GO_PATH="${WORKDIR}/.go"
+ENV RUSTUP_HOME="${WORKDIR}/.rustup"
+ENV CARGO_HOME="${WORKDIR}/.cargo"
+ENV GEM_PATH="${WORKDIR}/.gem"
+ENV npm_config_prefix="${WORKDIR}/.npm"
 # ENV TERM_PROGRAM="vscode"
 ENTRYPOINT [ "/entrypoint" ]
 CMD [ "sleep", "infinity" ]

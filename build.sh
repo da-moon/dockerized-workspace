@@ -15,6 +15,9 @@ export LOCAL
 
 IMAGE_NAME="${IMAGE_NAME:-$(basename "$(git rev-parse --show-prefix)")}"
 export IMAGE_NAME
+
+DISABLE_FROM_CACHE="${DISABLE_FROM_CACHE:-"true"}"
+export DISABLE_FROM_CACHE
 # ────────────────────────────────────────────────────────────
 CHAOTIC_AUR_KEY="${CHAOTIC_AUR_KEY:-"3056513887B78AEB"}"
 # ────────────────────────────────────────────────────────────

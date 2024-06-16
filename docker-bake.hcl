@@ -19,6 +19,9 @@
 # ╰──────────────────────────────────────────────────────────╯
 # docker buildx use default && docker buildx ls | awk '$2 ~ /^docker(-container)*$/{print $1}' | xargs -r -I {} docker buildx rm {}
 variable "LOCAL" { default = false }
+variable "DISABLE_FROM_CACHE" { default = false }
+variable "DISABLE_TO_CACHE" { default = false }
+variable "DISABLE_CACHE" { default = false }
 variable "REGISTRY_HOSTNAME" { default = "docker.io" }
 variable "REGISTRY_USERNAME" { default = "fjolsvin" }
 group "default" {
@@ -39,12 +42,12 @@ target "default" {
     : "${REGISTRY_HOSTNAME}/${REGISTRY_USERNAME}/gp-archlinux-workspace:latest",
   ]
   cache-from = [
-    equal(LOCAL, true)
+    equal(LOCAL, true) || equal(DISABLE_FROM_CACHE, true) || equal(DISABLE_CACHE, true)
     ? ""
     : "type=registry,mode=max,ref=${REGISTRY_HOSTNAME}/${REGISTRY_USERNAME}/gp-archlinux-workspace:cache",
   ]
   cache-to = [
-    equal(LOCAL, true)
+    equal(LOCAL, true) || equal(DISABLE_TO_CACHE, true) || equal(DISABLE_CACHE, true)
     ? ""
     : "type=registry,mode=max,ref=${REGISTRY_HOSTNAME}/${REGISTRY_USERNAME}/gp-archlinux-workspace:cache",
   ]
