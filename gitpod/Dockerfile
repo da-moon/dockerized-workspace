@@ -317,7 +317,7 @@ RUN \
     echo '[ -r "/tmp/rust-nightly.lock" ] && rm -f "/tmp/rust-nightly.lock" ;' ; \
     echo '[ -r "/tmp/rust-stable.lock" ] && rm -f "/tmp/rust-stable.lock" ;' ; \
     echo 'export PATH="${PATH}:${CARGO_HOME}/bin";' ; \
-  ) | tee -a "/etc/profile.d/00-rust.sh" > /dev/null ; \
+  ) | tee -a "/etc/profile.d/01-rust.sh" > /dev/null ; \
   # For fixing the following error:
   #
   # ❯ sudo su -
@@ -564,7 +564,7 @@ RUN \
     echo 'if gp version > /dev/null 2>&1 ; then' ;\
     echo '  eval "$(gp env --export)" ;' ;\
     echo 'fi' ;\
-  ) | tee "/etc/profile.d/gitpod.sh" > /dev/null || exit 1 ; \
+  ) | tee "/etc/profile.d/00-gitpod.sh" > /dev/null || exit 1 ; \
   ( \
     echo 'mkdir -p "${HOME}/.ssh" ;' ; \
     echo 'while IFS='=' read -r name value ; do ' ; \
