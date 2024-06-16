@@ -567,14 +567,18 @@ RUN \
     echo 'fi' ;\
   ) | tee "/etc/profile.d/00-gitpod.sh" > /dev/null || exit 1 ; \
   ( \
-    echo 'mkdir -p "${HOME}/.ssh" ;' ; \
-    echo 'while IFS='=' read -r name value ; do ' ; \
-    echo '  if [[ $name == *PRIVATE_KEY ]]; then ' ; \
+    echo 'mkdir -p "${HOME}/.ssh" && chmod 700 "${HOME}/.ssh" ;' ; \
+    echo '[ -r "${HOME}/.ssh/authorized_keys" ] && chmod 644 "${HOME}/.ssh/authorized_keys" ;' ; \
+    echo '[ -r "${HOME}/.ssh/known_hosts" ] && chmod 644 "${HOME}/.ssh/known_hosts" ;' ; \
+    echo '[ -r "${HOME}/.ssh/config" ] && chmod 644 "${HOME}/.ssh/config" ;' ; \
+    echo 'while IFS== read -r name value ; do' ; \
+    echo '  if [[ $name == *PRIVATE_KEY ]]; then' ; \
     echo '    PRIVATE_KEY_PATH="${HOME}/.ssh/"$(echo "$name" | tr \"[:upper:]\" \"[:lower:]\")"" ;' ; \
     echo '    echo "${value}" | base64 -d | tee "${PRIVATE_KEY_PATH}" > /dev/null ;' ; \
-    echo '  fi; ' ; \
-    echo 'done < <(printenv) ; ' ; \
+    echo '  fi;' ; \
+    echo 'done < <(printenv) ;' ; \
     echo 'find "${HOME}/.ssh" -type f -name 'id*' -exec chmod 600 {} \;' ; \
+    echo 'find "${HOME}/.ssh" -type f -name 'id*.pub' -exec chmod 644 {} \;' ; \
   ) | tee "/etc/profile.d/99-ssh-keys.sh" > /dev/null ; \
   echo '[ -r "${HOME}/.local/share/bash-completion/completions/git-forgit.bash" ] && source "${HOME}/.local/share/bash-completion/completions/git-forgit.bash"' > "/etc/profile.d/forgit.sh" > /dev/null || exit 1 ; \
   npm cache clean --quiet --force ; \
