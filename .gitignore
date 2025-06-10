@@ -49,6 +49,9 @@
 !/Makefile
 !/Vagrantfile
 !/build.sh
+!/build.ps1
+!/bake.sh
+!/bake.ps1
 !/docker-bake.hcl
 !/CONTRIBUTING.md
 !/CHANGELOG.md

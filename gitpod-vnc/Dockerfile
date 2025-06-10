@@ -14,7 +14,7 @@ ENV USER="gitpod"
 ENV UID="33333"
 ENV HOME="/home/${USER}"
 ARG WORKDIR="/workspace"
-ENV WORKDIR="${WORKDIR}"
+ENV WORKDIR "${WORKDIR}"
 VOLUME [ "${WORKDIR}" ]
 
 #  ╭──────────────────────────────────────────────────────────╮
@@ -118,7 +118,6 @@ RUN \
 #  ╭──────────────────────────────────────────────────────────╮
 #  │              install makepkg dependencies                │
 #  ╰──────────────────────────────────────────────────────────╯
-# hadolint ignore=SC2028
 RUN \
   (\
   echo 'SKIP_PKGS=(); \' ; \
@@ -160,20 +159,17 @@ ENV PATH="${PATH}:${CARGO_HOME}/bin"
 
 ENV PATH="${PATH}:${HOME}/.local/bin"
 ENV PATH="${PATH}:${HOME}/.luarocks/bin"
-# hadolint ignore=SC2016
+
 RUN \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   pacman --quiet --noprogressbar -Syy --noconfirm --needed \
   "chaotic-aur/powershell-bin" \
-  "net-tools" \
-  "musl" "kernel-headers-musl" \
   "go" \
   "ruby" \
-  "zig" \
   "rustup" "cargo-binstall" \
   "lua" "luajit" "luarocks" \
-  "python" "python-pip" "python-poetry" "python-setuptools" "uv" "python-pipx" \
+  "python" "python-pip" "python-poetry" "python-setuptools" \
   "nodejs" "npm" "yarn" \
   "base-devel" \
   "upx" \
@@ -302,18 +298,14 @@ RUN \
   # NOTE: installing rustup toolchains after container starts up. this helps with minimizing docker image size
   # https://stackoverflow.com/questions/28227739/lock-a-file-in-bash-using-flock-and-lockfile
   #  ────────────────────────────────────────────────────────────
-  # rustup component add rustfmt --toolchain nightly
-  # rustup component add rustfmt --toolchain stable
   rustup --version > /dev/null 2>&1 && ( \
     echo '(' ; \
     echo '  flock -x -n 3 || exit 55 ;' ; \
     echo '  ! ( rustup toolchain list | grep -q "nightly" ) && rustup toolchain install nightly ;' ; \
-    echo '  ! ( rustup component list --toolchain nightly --installed |  grep -q "rust-analyzer" ) || rustup component add rust-analyzer --toolchain nightly ;' ; \
     echo ') 3> "/tmp/rust-nightly.lock"' ; \
     echo '(' ; \
     echo '  flock -x -n 4 || exit 55 ;' ; \
     echo '  ! ( rustup toolchain list | grep -q "stable" ) && (rustup toolchain install stable && rustup default stable );' ; \
-    echo '  ! ( rustup component list --toolchain stable --installed | grep -q "rust-analyzer" ) || rustup component add rust-analyzer --toolchain stable ;' ; \
     echo ') 4> "/tmp/rust-stable.lock"' ; \
     echo '{' ; \
     echo '  flock -s 3 ;' ; \
@@ -339,7 +331,6 @@ RUN \
   ) ; \
   yq --version > /dev/null 2>&1 && echo 'eval "$(yq shell-completion bash)" ;' | tee "/etc/profile.d/yq.sh" > /dev/null || exit 1 ; \
   compress-packages ;
-
 # ──────────────────────────────────────────────────────────
 USER "${USER}"
 # hadolint ignore=SC2034,SC2046
@@ -430,7 +421,7 @@ RUN \
   "consul" "vault" \
   "starship" \
   "fzf" \
-  "github-cli"  "glab" \
+  "github-cli" \
   "git-delta" \
   "difftastic" \
   "zellij" \
@@ -589,9 +580,7 @@ RUN \
     echo 'find "${HOME}/.ssh" -type f -name 'id*' -exec chmod 600 {} \;' ; \
     echo 'find "${HOME}/.ssh" -type f -name 'id*.pub' -exec chmod 644 {} \;' ; \
   ) | tee "/etc/profile.d/99-ssh-keys.sh" > /dev/null ; \
-  ( \
-    echo '[ -r "${HOME}/.local/share/bash-completion/completions/git-forgit.bash" ] && source "${HOME}/.local/share/bash-completion/completions/git-forgit.bash"' ; \
-  ) | tee "/etc/profile.d/forgit.sh" > /dev/null ; \
+  echo '[ -r "${HOME}/.local/share/bash-completion/completions/git-forgit.bash" ] && source "${HOME}/.local/share/bash-completion/completions/git-forgit.bash"' > "/etc/profile.d/forgit.sh" > /dev/null || exit 1 ; \
   npm cache clean --quiet --force ; \
   go clean -modcache > /dev/null 2>&1 ; \
   su-exec "${USER}" go clean -modcache > /dev/null 2>&1 ; \
@@ -770,11 +759,58 @@ RUN \
   su-exec "${USER}" go clean -cache > /dev/null 2>&1 ; \
   rm -rf "$(go env GOPATH)/pkg/mod" ; \
   compress-packages ;
+# Generic
+# hadolint ignore=SC2034,DL3013,DL4006,SC2016
+RUN \
+  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
+  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
+  export PIP_NO_CACHE_DIR="off" ; \
+  export MAKEFLAGS="-j$(nproc)" ; \
+  export CGO_ENABLED=1; \
+  export CGO_LDFLAGS="-g -O2" ; \
+  AUR_CLONE_URLS=( \
+  "https://aur.archlinux.org/driftctl-bin.git" \
+  ) ; \
+  GROUPS_ARR=( \
+  "caddy" \
+  "traefik" \
+  ) ; \
+  pacman --quiet --noprogressbar -S --noconfirm --needed \
+  "caddy" \
+  "traefik" \
+  ; \
+  for url in "${AUR_CLONE_URLS[@]}";do \
+  git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
+  && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
+  && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
+  for i in {1..5}; do su-exec "${USER}" makepkg -sicr --nocheck --skipinteg --noconfirm --noprogressbar && break || sleep 15; done \
+  && popd > /dev/null 2>&1 || exit 1 ; \
+  done ; \
+  rm -rf "$(go env GOPATH)/pkg/mod" ; \
+  for group in "${GROUPS_ARR[@]}";do \
+  getent group "${group}" > /dev/null 2>&1 && usermod -aG "${group}" "${USER}" || continue ; \
+  done ; \
+  python3 -m pip install -q --no-cache-dir --break-system-packages \
+  "checkov" \
+  driftctl version >/dev/null 2>&1 && ( \
+  echo 'eval "$(driftctl completion bash)" ;' ; \
+  ) | tee -a "/etc/profile.d/generic-iac.sh" > /dev/null ; \
+  rm -rf "/tmp/"$(basename "${url%.git}")"" ; \
+  go clean -modcache ; \
+  su-exec "${USER}" go clean -modcache ; \
+  go clean -cache ; \
+  su-exec "${USER}" go clean -cache ; \
+  compress-packages ;
+# ────────────────────────────────────────────────────────────────────────────────
+# SHELL ["/usr/bin/pwsh", "-NoLogo", "-Command"]
+# # hadolint ignore=DL4006
+# RUN 'driftctl completion powershell | Out-String | Invoke-Expression' | Out-File -Append -Encoding ascii "$PROFILE"
+# SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 install nodejs packages                  │
 #  ╰──────────────────────────────────────────────────────────╯
 USER "root"
-# hadolint ignore=SC2016,DL3016
+# hadolint ignore=SC2016
 RUN \
   npm install --silent -g \
   "github-label-sync" \
@@ -790,17 +826,15 @@ RUN \
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                 install rust packages                    │
 #  ╰──────────────────────────────────────────────────────────╯
+ARG AICHAT_CONFIG_DIR="${HOME}/.config/aichat"
+ENV AICHAT_CONFIG_DIR="${AICHAT_CONFIG_DIR}"
+ARG AICHAT_CONFIG_FILE="${AICHAT_CONFIG_DIR}/config.yaml"
 USER "root"
-# "cargo-modules" \
-# "cargo-zigbuild" \
-# "cargo-workspaces" \
-# "cargo-auditable" \
-# hadolint ignore=SC2016,SC2162
+# hadolint ignore=SC2016
 RUN \
-  --mount=type=secret,id=github_token \
   rustup default "stable" \
-  && export GITHUB_TOKEN="$(cat /run/secrets/github_token 2>/dev/null || echo '')" \
-  && cargo binstall --no-confirm \
+  && cargo install --locked --git "https://github.com/flatt-security/shisho.git" \
+  && cargo binstall --quiet --no-confirm \
   "cargo-cache" \
   "cargo-watch" \
   "cargo-make" \
@@ -808,25 +842,13 @@ RUN \
   "cargo-deny" \
   "cargo-udeps" \
   "cargo-update" \
-  "cargo-edit" \
-  "cargo-outdated" \
-  "cargo-edit-locally" \
-  "cargo-upgrades" \
-  "cargo-machete" \
-  "cargo-expand" \
-  "cargo-nextest" \
-  "cargo-tarpaulin" \
-  "cargo-audit" \
-  "cargo-llvm-cov" \
-  "cargo-careful" \
-  "cargo-crev" \
-  "cargo-readme" \
-  "cargo-release" \
-  "cargo-generate" \
-  "cargo-license" \
-  "cargo-bloat" \
-  "cargo-geiger" \
-  "cargo-vendor" \
+  "legdur" \
+  "smartcat" \
+  "aichat" \
+  "pipr" \
+  "ttdl" \
+  "prose" \
+  "jaq" \
   && find "${CARGO_HOME}/bin" \
   -type f \
   -executable \
@@ -848,17 +870,155 @@ RUN \
   && cargo-cache --remove-dir "all" > /dev/null 2>&1 \
   && rustup toolchain list | cut -d' ' -f1 | xargs -r -I {} rustup --quiet toolchain uninstall {}  ; \
   # ────────────────────────────────────────────────────────────
+  # NOTE: aichat config
+  # ────────────────────────────────────────────────────────────
+  [ -n "$(which "aichat" 2>/dev/null)" ] && ( \
+    mkdir -p "${AICHAT_CONFIG_DIR}" \
+    && yq eval --null-input '.model = "mistral:mistral-large-latest"' \
+      | tee "${AICHAT_CONFIG_FILE}" > /dev/null \
+    && yq eval '. head_comment="model: openai:gpt-4o\nmodel: vertexai:gemini-1.5-pro-preview-0514\nmodel: mistral:mistral-large-latest"' -i "${AICHAT_CONFIG_FILE}" \
+    && yq eval '.save_session = true' -i "${AICHAT_CONFIG_FILE}" \
+    && yq eval '.clients = []' -i "${AICHAT_CONFIG_FILE}" \
+    && yq eval '.clients += {"type": "openai"}' -i "${AICHAT_CONFIG_FILE}" \
+    && yq eval '.clients += {"type": "openai-compatible", "name": "mistral"}' -i "${AICHAT_CONFIG_FILE}" \
+    && ( \
+      echo 'if [ -n "${VERTEXAI_API_KEY+x}" ] && [ -n "${VERTEXAI_API_KEY}" ] && [ -n "${VERTEX_AI_PROJECT_ID+x}" ] && [ -n "${VERTEX_AI_PROJECT_ID}" ] && [ -n "{VERTEX_AI_LOCATION+x}" ] && [ -n "${VERTEX_AI_LOCATION}" ]; then' ; \
+      echo '  yq eval "' ; \
+      echo '  .clients += {\"type\": \"vertexai\"} |' ; \
+      echo '  .model = \"vertexai:gemini-1.5-pro-preview-0514\"' ; \
+      echo '  " -i "${AICHAT_CONFIG_DIR}/config.yaml" ; \' ; \
+      echo 'fi ;' ; \
+      echo 'alias aichat="aichat --session \"\"\$(date -u +\"%Y-week-%V\")\"-\"\$(basename \"\$(pwd)\")\"\"" ; \' ; \
+    ) | tee "/etc/profile.d/aichat.sh" > /dev/null ; \
+  ) ; \
+  # ────────────────────────────────────────────────────────────
   # NOTE: cargo-make config
   # ────────────────────────────────────────────────────────────
   [ -n "$(which "cargo-make" 2>/dev/null)" ] && ( \
     COMPL_URL="https://raw.githubusercontent.com/sagiegurari/cargo-make/master/extra/shell/makers-completion.bash" ; \
     wget -qO "/etc/bash_completion.d/$(basename -s.bash "${COMPL_URL}")" "${COMPL_URL}" || echo "$(basename -s.bash "${COMPL_URL}") bash completion" >> /.failures ; \
   ) ;
+# #  ╭──────────────────────────────────────────────────────────╮
+# #  │                   Datascience Packages                   │
+# #  ╰──────────────────────────────────────────────────────────╯
+# # TODO: create a script for bootstrapping these packages
+# # hadolint ignore=SC2034,DL3013,DL4006,SC2016
+# RUN \
+#   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
+#   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
+#   pacman --quiet --noprogressbar -S --noconfirm --needed \
+#   "python-networkx" \
+#   "python-matplotlib" \
+#   "python-sympy" \
+#   "python-tabulate" \
+#   "python-pandas" \
+#   "python-numpy" \
+#   ; \
+#   python3 -m pip install -q --no-cache-dir --break-system-packages \
+#   "tsplib95" ; \
+#   compress-packages ;
+
+#  ╭──────────────────────────────────────────────────────────╮
+#  │                   VNC setup                              │
+#  ╰──────────────────────────────────────────────────────────╯
+# https://github.com/gitpod-io/workspace-images/blob/main/chunks/tool-vnc/Dockerfile
+# extra/x11vnc
+# extra/openbox
+# WINDOW_MANAGER=openbox
+# VNC_PORT=5900
+# NOVNC_PORT=6080
+# hadolint ignore=SC2034,DL3013,DL4006,SC2016
+RUN \
+  --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
+  --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
+  export PIP_NO_CACHE_DIR="off" ; \
+  export MAKEFLAGS="-j$(nproc)" ; \
+  export CGO_ENABLED=1; \
+  export CGO_LDFLAGS="-g -O2" ; \
+  AUR_CLONE_URLS=( \
+  # NOTE: this has to be the first package installed by AUR
+  "https://aur.archlinux.org/websockify.git" \
+  "https://aur.archlinux.org/novnc.git" \
+  ) ; \
+  for url in "${AUR_CLONE_URLS[@]}";do \
+  git clone --quiet "${url}" "/tmp/"$(basename "${url%.git}")"" \
+  && chown -R "$(id -u "${USER}"):$(id -g "${USER}")" "/tmp/"$(basename "${url%.git}")"" \
+  && pushd "/tmp/"$(basename "${url%.git}")"" > /dev/null 2>&1 ; \
+  for i in {1..5}; do su-exec "${USER}" makepkg -sicr --nocheck --skipinteg --noconfirm --noprogressbar && break || sleep 15; done \
+  && popd > /dev/null 2>&1 || exit 1 ; \
+  rm -rf "/tmp/"$(basename "${url%.git}")"" ; \
+  done ; \
+  # NOTE: you need to use tk backend. e.g for plotting with `matplotlib` , you have to import the library like the following example
+  #
+  # ```python
+  # import matplotlib
+  # matplotlib.use('TkAgg')
+  # ```
+  #
+  pacman --quiet --noprogressbar -S --noconfirm --needed \
+  "tk" \
+  "dbus" \
+  "xdg-utils" \
+  "gnome-keyring" \
+  "xfce4" \
+  "xfce4-terminal" \
+  "tigervnc" \
+  ; \
+  compress-packages ;
+
+COPY <<-"EOT" /opt/novnc/index.html
+<html><head><meta http-equiv="Refresh" content="0; url=vnc.html?autoconnect=true&reconnect=true&resize=scale"></head></html>
+EOT
+COPY --chmod=0755 <<-"EOT" /usr/local/bin/gp-vncsession
+#!/usr/bin/env bash
+set -eu
+function start_service() {
+	local executable="$1" && shift
+	local executable_name="${executable##*/}"
+	local args=("$@")
+	start-stop-daemon --make-pidfile --pidfile "/tmp/${executable_name}.pid" --remove-pidfile \
+		--quiet --background --start \
+		--startas "$BASH" -- -c "exec $executable ${args[*]} > /tmp/${executable_name}.log 2>&1"
+}
+function log::info() {
+	printf 'info[%s]: %s\n' "${0##*/}" "$@"
+}
+if test ! -e /tmp/.X0-lock; then {
+	: "${DISPLAY:=":0"}"
+	export DISPLAY
+	VNC_PORT=5900
+	NOVNC_PORT=6080
+	if ! mount | grep '/dev/shm.*size=4194304k' 1>/dev/null; then {
+		sudo mount -t tmpfs shm -osize=4096m /dev/shm && log::info "Increased shmem to 4GB" ||
+			log::info "Failed to increase shmem"
+	}; fi
+	log::info "$(sudo service dbus start | xargs)"
+	chmod 755 "$HOME/.xinitrc"
+	log::info "Starting tigerVNC server on port $VNC_PORT"
+	start_service "$(command -v vncserver)" -geometry "${TIGERVNC_GEOMETRY:-1920x1080}" -SecurityTypes None $DISPLAY
+	log::info "Waiting for the desktop to be fully loaded ..."
+	until pgrep xfdesktop 1>/dev/null; do {
+		sleep 0.2
+	}; done
+	log::info "Starting noVNC web client on port $NOVNC_PORT"
+	start_service "$BASH" /opt/novnc/utils/novnc_proxy --vnc localhost:${VNC_PORT} --listen ${NOVNC_PORT}
+}; fi
+EOT
+COPY --chmod=0755 <<-"EOT" /etc/profile.d/500-vnc.sh
+export DISPLAY=:0
+test -e "$GITPOD_REPO_ROOT" && gp-vncsession
+EOT
+COPY --chown="${USER}:${USER}" <<-"EOT" "${HOME}/.xinitrc"
+: "${DISPLAY:=":0"}"
+export DISPLAY
+exec dbus-launch --exit-with-session xfce4-session
+EOT
 #  ╭──────────────────────────────────────────────────────────╮
 #  │                   extra packages                         │
 #  ╰──────────────────────────────────────────────────────────╯
+# "extra/aws-cli-v2" \
+# "aur/semgrep-bin" \
 USER "root"
-# hadolint ignore=SC2155
 RUN \
   --mount=type=cache,id=pacman-db,sharing=private,mode=0777,target=/var/lib/pacman/sync \
   --mount=type=cache,id=pacman-cache,sharing=shared,mode=0777,target=/var/cache/pacman \
@@ -866,14 +1026,6 @@ RUN \
   export MAKEFLAGS="-j$(nproc)" ; \
   export CGO_ENABLED=1 ; \
   export CGO_LDFLAGS="-g -O2" ; \
-  GO_PAKCKAGES=( \
-  "github.com/Gelio/go-global-update@latest" \
-  "github.com/doronbehar/pistol/cmd/pistol@latest" \
-  "github.com/gitpod-io/dazzle@latest" \
-  ) ; \
-  for PKG in "${GO_PAKCKAGES[@]}"; do \
-    go install -v "${PKG}" ; \
-  done ; \
   mkdir -p \
     "${HOME}/.local/state/paru" \
     "${WORKDIR}" \
@@ -897,17 +1049,23 @@ RUN \
   "bottom" \
   "cocogitto" \
   "eva" \
+  "hck" \
   "mdcat" \
+  "navi" \
+  "xh" \
+  "xcp" \
   "neovim" \
   "nano" \
   "sd" \
   "duf" \
   "ncdu" \
+  "ripgrep-all" \
   "fd" \
   "tokei" \
   "hyperfine" \
   "bat-extras" \
   "prettier" \
+  "entr" \
   "podman" \
   "docker-machine" \
   "docker-scan" \
@@ -922,10 +1080,10 @@ RUN \
   "psutils" \
   "rclone" \
   "moreutils" \
-  "cosign" \
   "vector" \
+  "pulumi" \
+  "istio" \
   "trivy" \
-  "syft" \
   "python-lsp-jsonrpc" \
   "python-lsp-black" \
   "python-lsp-server" \
@@ -936,9 +1094,7 @@ RUN \
   "marksman" \
   "cfssl"  \
   "chaotic-aur/google-cloud-cli" \
-  "chaotic-aur/grype-bin" \
-  "chaotic-aur/aws-cli-v2" \
-  && su-exec "${USER}" paru -S --noconfirm --nocheck --needed --removemake --cleanafter \
+  && su-exec "${USER}" paru -S --noconfirm --needed --removemake --cleanafter \
   "aur/devc-bin" \
   "aur/nodejs-cspell" \
   "aur/commitlint" \
@@ -951,18 +1107,30 @@ RUN \
   "aur/diffsitter-bin" \
   "aur/vendir-bin" \
   "aur/qsv-bin" \
+  "aur/shellcheck-bin" \
   "aur/docker-sbom" \
   "aur/fzfx-git" \
   "aur/fzf-extras" \
   "aur/shellcheck-bin" \
   "aur/terrascan" \
   "aur/opa" \
+  "aur/pulumictl" \
+  "aur/infracost" \
+  "aur/k6" \
   "aur/rancher-k3d-bin" \
+  "aur/envoyproxy-bin" \
+  "aur/gojira" \
+  "aur/litmusctl" \
+  "aur/inlyne-bin" \
+  "aur/jql" \
+  "aur/ripsecrets" \
+  "aur/rnr-bin" \
   "aur/awk-language-server" \
   "aur/dockerfile-language-server-bin" \
   "aur/terraform-ls-bin" \
-  "aur/claude-code" \
-  "aur/semgrep-bin" \
+  && curl -fsSL "https://plandex.ai/install.sh" | bash > /dev/null 2>&1 \
+  && go install "github.com/Gelio/go-global-update@latest" \
+  && go install "github.com/doronbehar/pistol/cmd/pistol@latest" \
   && npm cache clean --quiet --force  \
   && go clean -modcache > /dev/null 2>&1 \
   && su-exec "${USER}" go clean -modcache > /dev/null 2>&1 \
@@ -974,7 +1142,6 @@ RUN \
 #  ╰──────────────────────────────────────────────────────────╯
 USER "${USER}"
 WORKDIR "${WORKDIR}"
-# hadolint ignore=SC2016
 RUN \
   ( \
   echo '[ -r "/entrypoint" ] && exec /entrypoint sudo -E -u "${USER}" bash --login' ; \
@@ -996,13 +1163,6 @@ RUN \
   echo "  IdentitiesOnly yes" ; \
   echo "  BatchMode yes" ; \
   echo "  IdentityFile=~/.ssh/id_rsa_github" ; \
-  echo "Host gitlab.com" ; \
-  echo "  StrictHostKeyChecking no" ; \
-  echo "  MACs hmac-sha2-512" ; \
-  echo "  UserKnownHostsFile=/dev/null" ; \
-  echo "  IdentitiesOnly yes" ; \
-  echo "  BatchMode yes" ; \
-  echo "  IdentityFile=~/.ssh/id_rsa_gitlab" ; \
   echo "Host mpr" ; \
   echo "  HostName mpr.hunterwittenborn.com" ; \
   echo "  IdentityFile ~/.ssh/id_rsa_makedeb" ; \
@@ -1117,7 +1277,6 @@ RUN \
 RUN \
   ( \
     echo '#!/bin/sh' ; \
-    echo 'mkdir -p "${HOME}/.cache/log" && sudo -E env USER="$(id -un)" supervisord --configuration "/etc/supervisord.conf" 2>&1 > /dev/null || true ;' ; \
     echo '[ -r "/usr/local/share/docker-from-docker.sh" ] && bash "/usr/local/share/docker-from-docker.sh" ;' ; \
     echo '[ -r "/usr/local/share/kary-comments.sh" ] && bash "/usr/local/share/kary-comments.sh" ;' ; \
     echo '[ -r "/usr/local/share/fix-ssh-permissions.sh" ] && bash "/usr/local/share/fix-ssh-permissions.sh" ;' ; \
