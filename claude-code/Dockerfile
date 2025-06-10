@@ -12,7 +12,17 @@ ENV UID="1000"
 ENV HOME="/home/${USER}"
 ARG WORKDIR="/workspace"
 ENV WORKDIR="${WORKDIR}"
-VOLUME ["${WORKDIR}"]
+# Define volumes for persistence
+VOLUME [ \
+  "${WORKDIR}", \
+  "${WORKDIR}/.rustup", \
+  "${WORKDIR}/.cargo", \
+  "${HOME}/.claude", \
+  "${HOME}/.claude.json", \
+  "${HOME}/.local/share/claude-code", \
+  "${HOME}/.npm", \
+  "${HOME}/.cache" \
+]
 # ────────────────────────────────────────────────────────────────────────────────
 # APK Package compression
 # ────────────────────────────────────────────────────────────────────────────────
@@ -75,7 +85,7 @@ RUN \
   # Install base dependencies
   apk add --no-cache \
     # Core utilities
-    bash bash-completion sudo shadow coreutils \
+    bash bash-completion sudo shadow coreutils su-exec \
     # Build essentials
     build-base cmake gcc g++ musl-dev linux-headers \
     # Version control
@@ -116,7 +126,7 @@ RUN \
     # Shell enhancements
     starship zoxide fzf atuin \
     # Development tools
-    tokei shellcheck shfmt \
+    tokei shellcheck shfmt hyperfine \
     # Task runners
     go-task \
   # Compress packages
@@ -136,101 +146,100 @@ RUN \
   echo "${USER} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/"${USER}" && \
   chmod 440 /etc/sudoers.d/"${USER}" && \
   # Create directories
-  mkdir -p "${WORKDIR}" "${HOME}/.local/bin" "${HOME}/.config" "${HOME}/.init.d" && \
-  chown -R "${UID}:${UID}" "${HOME}" "${WORKDIR}"
+  mkdir -p "${WORKDIR}" "${HOME}/.local/bin" "${HOME}/.config" "${HOME}/.init.d" "${HOME}/.provision.d" && \
+  chown -R "${UID}:${UID}" "${HOME}" "${WORKDIR}" && \
+  # Add provision directory to PATH
+  echo 'export PATH="${PATH}:${HOME}/.provision.d"' >> /etc/profile.d/00-provision.sh
 
 
 # ────────────────────────────────────────────────────────────────────────────────
 # Install Rust toolchain and tools during build
 # ────────────────────────────────────────────────────────────────────────────────
 USER "${USER}"
-ENV RUSTUP_HOME="${HOME}/.rustup"
-ENV CARGO_HOME="${HOME}/.cargo"
+ENV RUSTUP_HOME="${WORKDIR}/.rustup"
+ENV CARGO_HOME="${WORKDIR}/.cargo"
 ENV PATH="${PATH}:${CARGO_HOME}/bin"
 
-# # Install Rust and cargo tools
-# RUN --mount=type=secret,id=github_token \
-#   # Setup GitHub token for cargo-binstall if available
-#   if [ -f /run/secrets/github_token ]; then \
-#     export GITHUB_TOKEN=$(cat /run/secrets/github_token); \
-#   fi && \
-#   # Initialize rustup
-#   rustup-init -y --no-modify-path --profile minimal --default-toolchain stable && \
-#   # Add musl target
-#   rustup target add x86_64-unknown-linux-musl && \
-#   # Add components
-#   rustup component add rust-src rust-analyzer && \
-#   # Install nightly toolchain
-#   rustup toolchain install nightly && \
-#   # Install cargo-binstall
-#   cargo install --locked cargo-binstall && \
-#   # Install tools via cargo-binstall
-#   cargo binstall -y --no-confirm \
-#     cargo-cache \
-#     cargo-watch \
-#     cargo-edit \
-#     cargo-update \
-#     cargo-make \
-#     hyperfine && \
-#   # Clean up cargo cache
-#   cargo-cache --remove-dir all && \
-#   # Remove toolchains but keep cargo binaries
-#   rm -rf "${RUSTUP_HOME}/toolchains" "${RUSTUP_HOME}/downloads" "${RUSTUP_HOME}/tmp"
-
-# USER root
-# # Compress cargo binaries
-# RUN \
-#   find "${CARGO_HOME}/bin" -type f -executable | while read -r bin; do \
-#     upx -q "$bin" 2>/dev/null || true; \
-#   done
+# # Note: Rust toolchain installation moved to provision script
+# Only keep minimal setup here for image building
+RUN \
+  echo "Rust toolchain will be provisioned on first use via ~/.provision.d/rust-provision.sh"
 
 # ────────────────────────────────────────────────────────────────────────────────
 # Create initialization scripts
 # ────────────────────────────────────────────────────────────────────────────────
 USER "${USER}"
 
-# Rust toolchain initialization script
+# Rust toolchain provisioning script
 RUN \
   ( \
     echo '#!/bin/bash' ; \
     echo 'set -euo pipefail' ; \
     echo '' ; \
-    echo '# Rust toolchain installation with proper locking' ; \
-    echo '(' ; \
-    echo '  flock -x -n 3 || exit 55' ; \
-    echo '  if [ ! -d "${HOME}/.rustup/toolchains/stable"* ]; then' ; \
-    echo '    echo "Installing Rust stable toolchain..."' ; \
-    echo '    rustup toolchain install stable' ; \
-    echo '    rustup default stable' ; \
-    echo '  fi' ; \
-    echo ') 3> "/tmp/rust-stable.lock"' ; \
+    echo '# This script provisions Rust toolchain and tools' ; \
+    echo '# Run this when you need to work on a Rust project' ; \
     echo '' ; \
-    echo '(' ; \
-    echo '  flock -x -n 4 || exit 55' ; \
-    echo '  if [ ! -d "${HOME}/.rustup/toolchains/nightly"* ]; then' ; \
-    echo '    echo "Installing Rust nightly toolchain..."' ; \
-    echo '    rustup toolchain install nightly' ; \
-    echo '  fi' ; \
-    echo ') 4> "/tmp/rust-nightly.lock"' ; \
-    echo '' ; \
-    echo '# Wait for both locks to be released' ; \
-    echo '{' ; \
-    echo '  flock -s 3' ; \
-    echo '  flock -u 3' ; \
-    echo '} 3<"/tmp/rust-stable.lock"' ; \
-    echo '' ; \
-    echo '{' ; \
-    echo '  flock -s 4' ; \
-    echo '  flock -u 4' ; \
-    echo '} 4<"/tmp/rust-nightly.lock"' ; \
-    echo '' ; \
-    echo '# Clean up lock files' ; \
-    echo '[ -f "/tmp/rust-stable.lock" ] && rm -f "/tmp/rust-stable.lock"' ; \
-    echo '[ -f "/tmp/rust-nightly.lock" ] && rm -f "/tmp/rust-nightly.lock"' ; \
-    echo '' ; \
+    echo 'export RUSTUP_HOME="${WORKDIR}/.rustup"' ; \
+    echo 'export CARGO_HOME="${WORKDIR}/.cargo"' ; \
     echo 'export PATH="${PATH}:${CARGO_HOME}/bin"' ; \
-  ) | tee "${HOME}/.init.d/01-rust.sh" > /dev/null && \
-  chmod +x "${HOME}/.init.d/01-rust.sh"
+    echo '' ; \
+    echo '# Initialize rustup if not already done' ; \
+    echo 'if ! command -v rustup >/dev/null 2>&1; then' ; \
+    echo '  rustup-init -y --no-modify-path --profile minimal --default-toolchain stable' ; \
+    echo 'fi' ; \
+    echo '' ; \
+    echo '# Add musl target' ; \
+    echo 'rustup target add x86_64-unknown-linux-musl' ; \
+    echo '' ; \
+    echo '# Add components' ; \
+    echo 'rustup component add rust-src rust-analyzer' ; \
+    echo '' ; \
+    echo '# Install toolchains' ; \
+    echo '(' ; \
+    echo '  flock -x -n 3 || exit 55 ;' ; \
+    echo '  ! ( rustup toolchain list | grep -q "nightly" ) && rustup toolchain install nightly ;' ; \
+    echo '  ! ( rustup component list --toolchain nightly --installed |  grep -q "rust-analyzer" ) || rustup component add rust-analyzer --toolchain nightly ;' ; \
+    echo ') 3> "/tmp/rust-nightly.lock"' ; \
+    echo '(' ; \
+    echo '  flock -x -n 4 || exit 55 ;' ; \
+    echo '  ! ( rustup toolchain list | grep -q "stable" ) && (rustup toolchain install stable && rustup default stable );' ; \
+    echo '  ! ( rustup component list --toolchain stable --installed | grep -q "rust-analyzer" ) || rustup component add rust-analyzer --toolchain stable ;' ; \
+    echo ') 4> "/tmp/rust-stable.lock"' ; \
+    echo '{' ; \
+    echo '  flock -s 3 ;' ; \
+    echo '  flock -u 3 ;' ; \
+    echo '} 3<"/tmp/rust-nightly.lock" ;' ; \
+    echo '{' ; \
+    echo '  flock -s 4 ;' ; \
+    echo '  flock -u 4 ;' ; \
+    echo '} 4<"/tmp/rust-stable.lock"' ; \
+    echo '[ -r "/tmp/rust-nightly.lock" ] && rm -f "/tmp/rust-nightly.lock" ;' ; \
+    echo '[ -r "/tmp/rust-stable.lock" ] && rm -f "/tmp/rust-stable.lock" ;' ; \
+    echo '' ; \
+    echo '# Install cargo tools' ; \
+    echo 'if ! command -v cargo-binstall >/dev/null 2>&1; then' ; \
+    echo '  cargo install --locked cargo-binstall' ; \
+    echo 'fi' ; \
+    echo '' ; \
+    echo 'cargo binstall -y --no-confirm \\' ; \
+    echo '  cargo-cache \\' ; \
+    echo '  cargo-watch \\' ; \
+    echo '  cargo-edit \\' ; \
+    echo '  cargo-update \\' ; \
+    echo '  cargo-make' ; \
+    echo '' ; \
+    echo '# Clean up cargo cache' ; \
+    echo 'cargo-cache --remove-dir all' ; \
+    echo '' ; \
+    echo '# Compress binaries' ; \
+    echo 'find "${CARGO_HOME}/bin" -type f -executable | while read -r bin; do' ; \
+    echo '  upx -q "$bin" 2>/dev/null || true;' ; \
+    echo 'done' ; \
+    echo '' ; \
+    echo 'echo "Rust environment provisioned successfully!"' ; \
+    echo 'echo "Run: source /etc/profile.d/rust.sh to update PATH"' ; \
+  ) | tee "${HOME}/.provision.d/rust-provision.sh" > /dev/null && \
+  chmod +x "${HOME}/.provision.d/rust-provision.sh"
 
 USER "root"
 RUN \
@@ -255,24 +264,11 @@ RUN \
     echo '    ' ; \
     echo '    claude mcp add --scope user -- context7 npx -y @upstash/context7-mcp@latest 2>/dev/null || true' ; \
     echo '    ' ; \
-    echo '    if [ -n "${TAVILY_API_KEY:-}" ]; then' ; \
-    echo '      claude mcp add --scope user -- tavily-mcp npx -y tavily-mcp@0.1.3 2>/dev/null || true' ; \
-    echo '    fi' ; \
-    echo '    ' ; \
+    echo '    claude mcp add --scope user -- tavily-mcp npx -y tavily-mcp@0.1.3 2>/dev/null || true' ; \
     echo '    claude mcp add --scope user -- sequential-thinking npx -y @modelcontextprotocol/server-sequential-thinking 2>/dev/null || true' ; \
-    echo '    ' ; \
-    echo '    if [ -n "${PERPLEXITY_API_KEY:-}" ]; then' ; \
-    echo '      claude mcp add --scope user -- perplexity-ask npx -y server-perplexity-ask 2>/dev/null || true' ; \
-    echo '    fi' ; \
-    echo '    ' ; \
-    echo '    if [ -n "${EXA_API_KEY:-}" ]; then' ; \
-    echo '      claude mcp add --scope user -- exa npx -y exa-mcp-server --tools=web_search_exa,github_search,crawling 2>/dev/null || true' ; \
-    echo '    fi' ; \
-    echo '    ' ; \
-    echo '    if [ -n "${FIRECRAWL_API_KEY:-}" ]; then' ; \
-    echo '      claude mcp add --scope user -- firecrawl npx -y firecrawl-mcp 2>/dev/null || true' ; \
-    echo '    fi' ; \
-    echo '    ' ; \
+    echo '    claude mcp add --scope user -- perplexity-ask npx -y server-perplexity-ask 2>/dev/null || true' ; \
+    echo '    claude mcp add --scope user -- exa npx -y exa-mcp-server --tools=web_search_exa,github_search,crawling 2>/dev/null || true' ; \
+    echo '    claude mcp add --scope user -- firecrawl npx -y firecrawl-mcp 2>/dev/null || true' ; \
     echo '    claude mcp add --scope user -- gitlab-mcp-doc uvx --from mcpdoc mcpdoc \' ; \
     echo '      --urls \' ; \
     echo '      GitLabAdmin:https://raw.githubusercontent.com/da-moon/llms.txt/refs/heads/master/gitlab/administration.txt \' ; \
@@ -324,35 +320,84 @@ RUN \
 # ────────────────────────────────────────────────────────────────────────────────
 # Shell configuration
 # ────────────────────────────────────────────────────────────────────────────────
+USER root
 RUN \
   # Starship prompt
-  echo 'eval "$(starship init bash)"' >> "${HOME}/.bashrc" && \
+  echo 'eval "$(starship init bash)"' | tee "/etc/profile.d/starship.sh" > /dev/null && \
   # Zoxide
-  echo 'eval "$(zoxide init bash)"' >> "${HOME}/.bashrc" && \
-  echo 'alias cd="z"' >> "${HOME}/.bashrc" && \
+  ( \
+    echo 'export _ZO_DATA_DIR="${WORKDIR}/.zoxide/"' ; \
+    echo '[ ! -d "${_ZO_DATA_DIR}" ] && mkdir -p "${_ZO_DATA_DIR}" ;' ; \
+    echo 'eval "$(zoxide init bash)"' ; \
+    echo 'alias cd="z"' ; \
+  ) | tee "/etc/profile.d/zoxide.sh" > /dev/null && \
   # Atuin
-  mkdir -p "${HOME}/.config/atuin" && \
-  echo "db_path = \"${WORKDIR}/.history.db\"" > "${HOME}/.config/atuin/config.toml" && \
-  echo 'eval "$(atuin init bash)"' >> "${HOME}/.bashrc" && \
-  # Better ls
-  echo 'alias ls="eza"' >> "${HOME}/.bashrc" && \
-  echo 'alias ll="eza -l"' >> "${HOME}/.bashrc" && \
-  echo 'alias la="eza -la"' >> "${HOME}/.bashrc" && \
-  # Better cat
-  echo 'alias cat="bat -pp"' >> "${HOME}/.bashrc" && \
+  ( \
+    echo '[ ! -d "${HOME}/.config/atuin" ] && mkdir -p "${HOME}/.config/atuin" ;' ; \
+    echo "echo 'db_path = \"${WORKDIR}/.history.db\"' > '${HOME}/.config/atuin/config.toml' ;" ; \
+    echo 'eval "$(atuin init bash)"' ; \
+  ) | tee "/etc/profile.d/atuin.sh" > /dev/null && \
+  # Better ls and cat
+  ( \
+    echo 'alias ls="eza"' ; \
+    echo 'alias ll="eza -l"' ; \
+    echo 'alias la="eza -la"' ; \
+  ) | tee "/etc/profile.d/eza.sh" > /dev/null && \
+  ( \
+    echo 'alias cat="bat -pp"' ; \
+  ) | tee "/etc/profile.d/bat.sh" > /dev/null && \
   # FZF
-  echo '[ -f /usr/share/fzf/completion.bash ] && source /usr/share/fzf/completion.bash' >> "${HOME}/.bashrc" && \
-  echo '[ -f /usr/share/fzf/key-bindings.bash ] && source /usr/share/fzf/key-bindings.bash' >> "${HOME}/.bashrc" && \
+  ( \
+    echo '[ -f /usr/share/fzf/completion.bash ] && source /usr/share/fzf/completion.bash' ; \
+    echo '[ -f /usr/share/fzf/key-bindings.bash ] && source /usr/share/fzf/key-bindings.bash' ; \
+  ) | tee "/etc/profile.d/fzf.sh" > /dev/null && \
   # Environment variables
-  echo 'export EDITOR="hx"' >> "${HOME}/.bashrc" && \
-  echo 'export VISUAL="hx"' >> "${HOME}/.bashrc" && \
-  echo 'export PATH="${HOME}/.local/bin:${CARGO_HOME}/bin:${PATH}"' >> "${HOME}/.bashrc" && \
-  # Poetry
-  echo 'export PATH="${HOME}/.local/bin:${PATH}"' >> "${HOME}/.bashrc" && \
+  ( \
+    echo 'export EDITOR="hx"' ; \
+    echo 'export VISUAL="hx"' ; \
+    echo 'export PATH="${HOME}/.local/bin:${CARGO_HOME}/bin:${PATH}"' ; \
+  ) | tee "/etc/profile.d/editor.sh" > /dev/null && \
   # Task completions
-  echo 'eval "$(task --completion bash 2>/dev/null)"' >> "${HOME}/.bashrc" && \
-  # Run init scripts
-  echo 'for script in "${HOME}"/.init.d/*.sh; do [ -r "$script" ] && source "$script"; done' >> "${HOME}/.bashrc"
+  echo 'eval "$(task --completion bash 2>/dev/null)"' | tee "/etc/profile.d/task.sh" > /dev/null && \
+  # Rust environment
+  ( \
+    echo 'export RUSTUP_HOME="${WORKDIR}/.rustup"' ; \
+    echo 'export CARGO_HOME="${WORKDIR}/.cargo"' ; \
+    echo 'export PATH="${PATH}:${CARGO_HOME}/bin"' ; \
+  ) | tee "/etc/profile.d/rust.sh" > /dev/null
+
+USER "${USER}"
+# Configure user's bashrc and profile
+RUN \
+  # Configure bashrc to follow gitpod pattern
+  ( \
+    echo '# Source global definitions' ; \
+    echo 'if [ -f /etc/bashrc ]; then' ; \
+    echo '  . /etc/bashrc' ; \
+    echo 'fi' ; \
+    echo '' ; \
+    echo '# Source profile.d scripts' ; \
+    echo 'for i in /etc/profile.d/*.sh; do' ; \
+    echo '  if [ -r "$i" ]; then' ; \
+    echo '    . "$i"' ; \
+    echo '  fi' ; \
+    echo 'done' ; \
+    echo '' ; \
+    echo '# Run init scripts' ; \
+    echo 'for script in "${HOME}"/.init.d/*.sh; do' ; \
+    echo '  [ -r "$script" ] && source "$script"' ; \
+    echo 'done' ; \
+  ) | tee "${HOME}/.bashrc" > /dev/null && \
+  # Configure profile
+  ( \
+    echo '# if running bash' ; \
+    echo 'if [ -n "$BASH_VERSION" ]; then' ; \
+    echo '  # include .bashrc if it exists' ; \
+    echo '  if [ -f "$HOME/.bashrc" ]; then' ; \
+    echo '    . "$HOME/.bashrc"' ; \
+    echo '  fi' ; \
+    echo 'fi' ; \
+  ) | tee "${HOME}/.profile" > /dev/null
 
 # ────────────────────────────────────────────────────────────────────────────────
 # Entrypoint
@@ -373,10 +418,19 @@ RUN \
     echo '  find "${HOME}/.ssh" -type f -name "id_*.pub" -exec chmod 644 {} \; 2>/dev/null || true' ; \
     echo 'fi' ; \
     echo '' ; \
-    # ERROR:
-    # su: must be suid to work properly
-    # echo 'exec su - "${USER}" -c '"'"'cd "${WORKDIR}" && exec "$@"'"'"' -- "$@"' ; \
-    echo 'exec "$@"' ; \
+    echo '# Run init scripts before executing command' ; \
+    echo 'if [ -d "${HOME}/.init.d" ]; then' ; \
+    echo '  for script in "${HOME}"/.init.d/*.sh; do' ; \
+    echo '    [ -r "$script" ] && source "$script"' ; \
+    echo '  done' ; \
+    echo 'fi' ; \
+    echo '' ; \
+    echo '# Switch to user and execute command' ; \
+    echo 'if [ "$(id -u)" = "0" ]; then' ; \
+    echo '  exec su-exec "${USER}" "$@"' ; \
+    echo 'else' ; \
+    echo '  exec "$@"' ; \
+    echo 'fi' ; \
 
   ) | tee /entrypoint.sh > /dev/null && \
   chmod +x /entrypoint.sh
